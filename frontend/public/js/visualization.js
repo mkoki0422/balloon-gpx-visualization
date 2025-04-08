@@ -22,6 +22,8 @@ const Visualization = {
     lastInfoData: null,
     lastHighlightedIndex: null,
     lastTimelinePercentage: null,
+    trackACircle: null,
+    trackBCircle: null,
     
     // 初期化
     init() {
@@ -310,7 +312,6 @@ const Visualization = {
         const speedSlider = document.getElementById('speed-slider');
         if (speedSlider) {
             speedSlider.addEventListener('input', (e) => {
-                console.log('Speed slider changed:', e.target.value);
                 this.setPlaybackSpeed(parseFloat(e.target.value));
             });
         }
@@ -332,6 +333,21 @@ const Visualization = {
     // コントロールのイベントリスナーをセットアップ
     initControlListeners() {
         console.log('[DEBUG] Initializing control listeners');
+
+        // スピードスライダーのイベントリスナー
+        const speedSlider = document.getElementById('speed-slider');
+        if (speedSlider) {
+            speedSlider.addEventListener('input', (event) => {
+                const speed = parseFloat(event.target.value);
+                console.log(`[DEBUG] Speed slider changed: ${speed}`);
+                this.setSpeed(speed);
+            });
+            
+            // 初期値を設定
+            this.setSpeed(parseFloat(speedSlider.value));
+        } else {
+            console.warn('[DEBUG] Speed slider not found');
+        }
 
         // Map style toggle
         const mapStyleButton = document.getElementById('map-style-button');
@@ -375,21 +391,6 @@ const Visualization = {
             });
         } else {
             console.warn('[DEBUG] Reset time button not found');
-        }
-
-        // Speed control
-        const speedSlider = document.getElementById('speed-slider');
-        if (speedSlider) {
-            speedSlider.addEventListener('input', (event) => {
-                const speed = parseFloat(event.target.value);
-                console.log('[DEBUG] Speed slider changed:', speed);
-                this.setSpeed(speed);
-            });
-            
-            // Set initial speed
-            this.setSpeed(1.0);
-        } else {
-            console.warn('[DEBUG] Speed slider not found');
         }
     },
     
@@ -747,6 +748,19 @@ const Visualization = {
         if (this.trackAMarker) {
             if (latA != null && lonA != null) {
                 this.trackAMarker.setLatLng([latA, lonA]);
+                
+                // トラックAの位置円を更新または作成
+                if (this.trackACircle) {
+                    this.trackACircle.setLatLng([latA, lonA]);
+                } else {
+                    this.trackACircle = L.circle([latA, lonA], {
+                        color: '#ef4444',
+                        fillColor: '#ef4444',
+                        fillOpacity: 0.2,
+                        radius: 15, // 15メートルの円
+                        weight: 1
+                    }).addTo(this.map);
+                }
             }
         } else if (latA != null && lonA != null && this.map) {
             // マーカーが初期化されていない場合は作成
@@ -759,6 +773,15 @@ const Visualization = {
                     iconAnchor: [7, 7]
                 })
             }).addTo(this.map);
+            
+            // トラックAの位置円を作成
+            this.trackACircle = L.circle([latA, lonA], {
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.2,
+                radius: 15,
+                weight: 1
+            }).addTo(this.map);
         }
         
         // トラックBのマーカー更新
@@ -767,6 +790,19 @@ const Visualization = {
         if (this.trackBMarker) {
             if (latB != null && lonB != null) {
                 this.trackBMarker.setLatLng([latB, lonB]);
+                
+                // トラックBの位置円を更新または作成
+                if (this.trackBCircle) {
+                    this.trackBCircle.setLatLng([latB, lonB]);
+                } else {
+                    this.trackBCircle = L.circle([latB, lonB], {
+                        color: '#3b82f6',
+                        fillColor: '#3b82f6',
+                        fillOpacity: 0.2,
+                        radius: 15,
+                        weight: 1
+                    }).addTo(this.map);
+                }
             }
         } else if (latB != null && lonB != null && this.map) {
             // マーカーが初期化されていない場合は作成
@@ -778,6 +814,15 @@ const Visualization = {
                     iconSize: [14, 14],
                     iconAnchor: [7, 7]
                 })
+            }).addTo(this.map);
+            
+            // トラックBの位置円を作成
+            this.trackBCircle = L.circle([latB, lonB], {
+                color: '#3b82f6',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.2,
+                radius: 15,
+                weight: 1
             }).addTo(this.map);
         }
     },
@@ -848,6 +893,8 @@ const Visualization = {
         if (this.trackBMarker) { this.map.removeLayer(this.trackBMarker); this.trackBMarker = null; }
         if (this.trackAPolyline) { this.map.removeLayer(this.trackAPolyline); this.trackAPolyline = null; }
         if (this.trackBPolyline) { this.map.removeLayer(this.trackBPolyline); this.trackBPolyline = null; }
+        if (this.trackACircle) { this.map.removeLayer(this.trackACircle); this.trackACircle = null; }
+        if (this.trackBCircle) { this.map.removeLayer(this.trackBCircle); this.trackBCircle = null; }
         console.log('Tracks cleared.');
     },
     
@@ -2295,13 +2342,16 @@ const Visualization = {
     },
 
     setSpeed(speed) {
-        this.playbackSpeed = Math.max(0.1, Math.min(10.0, speed));
+        // 速度を1倍から10倍の範囲に制限
+        this.playbackSpeed = Math.max(1, Math.min(10, speed));
         console.log(`[DEBUG] Playback speed set to ${this.playbackSpeed}x`);
         
-        // スピード表示を更新
-        const speedValue = document.getElementById('speed-value');
-        if (speedValue) {
-            speedValue.textContent = this.playbackSpeed.toFixed(1) + 'x';
+        // 速度表示を更新
+        const speedDisplay = document.getElementById('speed-display');
+        if (speedDisplay) {
+            speedDisplay.textContent = `${this.playbackSpeed.toFixed(1)}x`;
+        } else {
+            console.warn('[DEBUG] Speed display element not found');
         }
     }
 }; 
