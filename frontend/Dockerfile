@@ -1,15 +1,13 @@
-FROM nginx:alpine
+FROM node:20-slim
 
-# Nginxの設定ファイルをコピー
-COPY nginx.conf /etc/nginx/nginx.conf
+WORKDIR /app
 
-# 静的ファイルをコピー
-COPY public /usr/share/nginx/html
+COPY package*.json ./
 
-# パーミッションを設定
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chmod -R 755 /usr/share/nginx/html
+RUN npm install
 
-EXPOSE 80
+COPY . .
 
-CMD ["nginx", "-g", "daemon off;"] 
+EXPOSE 8080
+
+CMD ["npm", "run", "dev"] 

@@ -189,41 +189,53 @@ function setupEventListeners() {
         })
         .then(processResult => {
             console.log('処理成功:', Object.keys(processResult));
+            // 詳細なデバッグ情報を追加
+            console.log('visualization_dataの型:', typeof processResult.visualization_data);
+            console.log('visualization_dataの内容:', processResult.visualization_data);
+            console.log('table_dataの型:', typeof processResult.table_data);
+            console.log('table_dataの内容:', JSON.stringify(processResult.table_data, null, 2));
+            console.log('summaryの型:', typeof processResult.summary);
+            console.log('summaryの内容:', JSON.stringify(processResult.summary, null, 2));
+
+            // データの型チェックと変換
+            if (!processResult.visualization_data) {
+                throw new Error('可視化データが見つかりません');
+            }
+
+            // visualization_dataを配列に変換
+            const visualizationData = Array.isArray(processResult.visualization_data) 
+                ? processResult.visualization_data 
+                : Object.values(processResult.visualization_data);
+
+            console.log('変換後のvisualization_dataの型:', Array.isArray(visualizationData) ? 'array' : typeof visualizationData);
+            console.log('変換後のvisualization_dataの長さ:', visualizationData.length);
+
             showLoadingIndicator('データを描画中...');
 
-            // ★★★ 変更点: Visualizationのセットアップを呼び出す ★★★
+            // ビジュアライゼーションセクションに切り替え
             document.getElementById('upload-section').classList.add('hidden');
             document.getElementById('visualization-section').classList.remove('hidden');
 
             // マップコンテナが表示された後にセットアップを実行
             try {
-                 Visualization.setupMapAndViz(
-                     'map-container', // マップコンテナのID
-                     processResult.visualization_data,
-                     processResult.table_data
-                 );
-                 document.getElementById('map-container').classList.add('map-initialized');
-                 console.log('ビジュアライゼーションのセットアップ完了。')
-                 // uploadStatus は setupMapAndViz の中で更新されるか、ここで上書き
-                 // uploadStatus.textContent = 'データの処理・描画が完了しました！';
+                Visualization.setupMapAndViz(
+                    'map-container', // マップコンテナのID
+                    visualizationData, // 変換済みのvisualization_data
+                    processResult.table_data
+                );
+                document.getElementById('map-container').classList.add('map-initialized');
+                console.log('ビジュアライゼーションのセットアップ完了。');
 
-                 // サマリー表示は setupMapAndViz の外で良い
-                 displaySummary(processResult.summary);
-
+                // サマリー表示
+                displaySummary(processResult.summary);
             } catch (error) {
-                 console.error("Visualization setup failed:", error);
-                 console.log("エラー: ビジュアライゼーションのセットアップに失敗しました。", error.message);
-                 uploadStatus.textContent = `エラー: ビジュアライゼーションのセットアップに失敗しました: ${error.message}`;
-                 // 必要なら visualization-section を再度隠すなどの処理
-                 document.getElementById('visualization-section').classList.add('hidden');
-                 document.getElementById('upload-section').classList.remove('hidden');
+                console.error("Visualization setup failed:", error);
+                console.log("エラー: ビジュアライゼーションのセットアップに失敗しました。", error.message);
+                showError(`ビジュアライゼーションのセットアップに失敗しました: ${error.message}`);
+                // 必要なら visualization-section を再度隠すなどの処理
+                document.getElementById('visualization-section').classList.add('hidden');
+                document.getElementById('upload-section').classList.remove('hidden');
             }
-
-            // ★★★ 削除: 古い呼び出し ★★★
-            // Visualization.setVisualizationData(processResult.visualization_data);
-            // Visualization.populateTable(processResult.table_data);
-            // displaySummary(processResult.summary);
-            // if (Visualization.map) { requestAnimationFrame(() => { ... }); }
 
         })
         .catch(error => {
@@ -240,9 +252,74 @@ function setupEventListeners() {
     };
     
     // サンプルデータの読み込み
-    document.getElementById('load-sample').addEventListener('click', () => {
-        console.log('サンプルデータ読み込みボタンがクリックされました', API);
-        loadSampleData();
+    document.getElementById('load-sample').addEventListener('click', async () => {
+        console.log('サンプルデータ読み込みボタンがクリックされました');
+        try {
+            showLoadingIndicator('サンプルデータを読み込み中...');
+            const result = await API.loadSampleData();
+            console.log('サンプルデータ読み込み結果:', result);
+
+            // 処理リクエストを送信
+            const processResult = await API.processData(
+                result.file_a_path,
+                result.file_b_path,
+                result.time_range ? result.time_range.start : null,
+                result.time_range ? result.time_range.end : null
+            );
+
+            console.log('処理結果:', processResult);
+            console.log('visualization_dataの型:', typeof processResult.visualization_data);
+            console.log('visualization_dataの内容:', processResult.visualization_data);
+
+            // データの型チェックと変換
+            if (!processResult.visualization_data) {
+                throw new Error('可視化データが見つかりません');
+            }
+
+            // visualization_dataを配列に変換
+            const visualizationData = Array.isArray(processResult.visualization_data) 
+                ? processResult.visualization_data 
+                : Object.values(processResult.visualization_data);
+
+            console.log('変換後のvisualization_dataの型:', Array.isArray(visualizationData) ? 'array' : typeof visualizationData);
+            console.log('変換後のvisualization_dataの長さ:', visualizationData.length);
+
+            showLoadingIndicator('データを描画中...');
+
+            // ビジュアライゼーションセクションに切り替え
+            document.getElementById('upload-section').classList.add('hidden');
+            document.getElementById('visualization-section').classList.remove('hidden');
+
+            // マップコンテナが表示された後にセットアップを実行
+            try {
+                Visualization.setupMapAndViz(
+                    'map-container', // マップコンテナのID
+                    visualizationData, // 変換済みのvisualization_data
+                    processResult.table_data
+                );
+                document.getElementById('map-container').classList.add('map-initialized');
+                console.log('ビジュアライゼーションのセットアップ完了。');
+
+                // サマリー表示
+                displaySummary(processResult.summary);
+            } catch (error) {
+                console.error("Visualization setup failed:", error);
+                console.log("エラー: ビジュアライゼーションのセットアップに失敗しました。", error.message);
+                showError(`ビジュアライゼーションのセットアップに失敗しました: ${error.message}`);
+                // エラー時はアップロードセクションに戻す
+                document.getElementById('visualization-section').classList.add('hidden');
+                document.getElementById('upload-section').classList.remove('hidden');
+            }
+
+            hideLoadingIndicator();
+        } catch (error) {
+            console.error('サンプルデータ読み込みエラー:', error);
+            showError('サンプルデータの読み込み中にエラーが発生しました: ' + error.message);
+            // エラー時はアップロードセクションを表示
+            document.getElementById('visualization-section').classList.add('hidden');
+            document.getElementById('upload-section').classList.remove('hidden');
+            hideLoadingIndicator();
+        }
     });
     
     // サマリー情報の表示
@@ -430,7 +507,12 @@ function handleFileUpload(files) {
                     console.log('Initializing visualization with data from API response');
                     try {
                         // 可視化データをセット
-                        Visualization.setVisualizationData(response.visualizationData);
+                        Visualization.setupMapAndViz(
+                            'map-container',
+                            response.visualizationData,
+                            response.tableData
+                        );
+                        document.getElementById('map-container').classList.add('map-initialized');
                         console.log('Visualization data set successfully');
                         
                         // 時間範囲データの更新
@@ -458,85 +540,6 @@ function handleFileUpload(files) {
             console.error('API error:', error);
             hideLoadingIndicator();
             showError('API接続エラー: ' + (error.message || '不明なエラー'));
-        });
-}
-
-// サンプルデータの読み込み
-function loadSampleData() {
-    console.log('Loading sample data');
-    showLoadingIndicator('サンプルデータ読み込み中...');
-    
-    API.loadSampleData()
-        .then(response => {
-            console.log('Sample data loaded:', response);
-            
-            // ファイルパスが含まれているかチェック
-            if (response && response.file_a_path && response.file_b_path) {
-                showSuccessMessage('サンプルデータの読み込みが完了しました');
-                
-                // バックエンドにデータ処理をリクエスト
-                return API.processData(
-                    response.file_a_path,
-                    response.file_b_path,
-                    response.time_range && response.time_range.start ? response.time_range.start : null,
-                    response.time_range && response.time_range.end ? response.time_range.end : null
-                ).then(processResponse => {
-                    if (processResponse && processResponse.visualization_data) {
-                        switchToVisualizationView();
-                        
-                        // 3Dビジュアライゼーションを初期化
-                        if (typeof Visualization !== 'undefined' && Visualization) {
-                            console.log('Initializing visualization with processed data');
-                            try {
-                                // 可視化データをセット
-                                Visualization.setVisualizationData(processResponse.visualization_data);
-                                console.log('Visualization data set successfully');
-                                
-                                // 時間範囲データの更新
-                                if (processResponse.time_range) {
-                                    const startTime = new Date(processResponse.time_range.start).getTime();
-                                    const endTime = new Date(processResponse.time_range.end).getTime();
-                                    updateTimeRange({
-                                        startTime: startTime,
-                                        endTime: endTime
-                                    });
-                                }
-                                
-                                // テーブルデータを更新
-                                if (processResponse.table_data) {
-                                    updateDataTable(processResponse.table_data);
-                                }
-                                
-                                // タイムバーを初期位置に設定
-                                if (Visualization.updateTimePosition) {
-                                    Visualization.updateTimePosition(0);
-                                }
-                            } catch (error) {
-                                console.error('Error setting visualization data:', error);
-                                showError('データの可視化中にエラーが発生しました: ' + error.message);
-                            }
-                        } else {
-                            console.error('Visualization module not found');
-                            showError('Visualizationモジュールが見つかりません');
-                        }
-                    } else {
-                        console.error('No visualization data in process response');
-                        showError('データの処理結果に可視化データが含まれていません');
-                    }
-                });
-            } else {
-                const errorMsg = response && response.message 
-                    ? response.message 
-                    : 'サンプルデータの読み込み中に不明なエラーが発生しました';
-                showError(errorMsg);
-            }
-        })
-        .catch(error => {
-            console.error('API error:', error);
-            showError('API接続エラー: ' + (error.message || '不明なエラー'));
-        })
-        .finally(() => {
-            hideLoadingIndicator();
         });
 }
 

@@ -59,19 +59,22 @@ const Visualization = {
         }
     },
     
-    // ビジュアライゼーションデータを設定する関数
-    setVisualizationData(visualizationData) {
-        console.log('Visualization.setVisualizationData called');
-        
-        if (!visualizationData || visualizationData.length === 0) {
-            console.error('Visualization data is empty or invalid.');
-            return;
+    // データの前処理を行う共通関数
+    preprocessVisualizationData(visualizationData) {
+        if (!visualizationData || !Array.isArray(visualizationData)) {
+            console.error('Visualization data is not an array.');
+            return [];
         }
-        
+
+        if (visualizationData.length === 0) {
+            console.error('Visualization data is empty.');
+            return [];
+        }
+
         // タイムスタンプが存在するか確認し、必要に応じて追加
         const hasTimestamps = visualizationData.some(data => data.timestamp !== undefined);
         if (!hasTimestamps) {
-            console.log('No timestamp data found in setVisualizationData. Adding timestamps based on time values...');
+            console.log('No timestamp data found. Adding timestamps based on time values...');
             // タイムスタンプを生成
             visualizationData.forEach((data, index) => {
                 if (data.time) {
@@ -88,12 +91,25 @@ const Visualization = {
                     data.timestamp = index * 100;
                 }
             });
-            console.log('Timestamps added to visualization data in setVisualizationData.');
+            console.log('Timestamps added to visualization data.');
+        }
+
+        return visualizationData;
+    },
+    
+    // ビジュアライゼーションデータを設定する関数
+    setVisualizationData(visualizationData) {
+        console.log('Visualization.setVisualizationData called');
+        
+        // データの前処理
+        const processedData = this.preprocessVisualizationData(visualizationData);
+        if (processedData.length === 0) {
+            return;
         }
         
         // データを設定
-        this.visualizationData = visualizationData;
-        this.originalData = visualizationData;
+        this.visualizationData = processedData;
+        this.originalData = processedData;
         this.currentTimeIndex = 0;
         
         // マップが初期化されていない場合は初期化

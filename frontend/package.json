@@ -1,0 +1,17 @@
+{
+  "name": "balloon-gpx-visualization-frontend",
+  "version": "1.0.0",
+  "description": "GPX Visualization Frontend",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "three": "^0.135.0"
+  },
+  "devDependencies": {
+    "vite": "^5.1.4"
+  }
+} 

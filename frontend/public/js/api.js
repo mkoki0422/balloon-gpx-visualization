@@ -90,6 +90,19 @@ const API = {
             
             const result = await response.json();
             console.log('データ処理成功:', result ? '結果あり' : '結果なし', Object.keys(result));
+            
+            // デバッグ情報を追加
+            console.log('visualization_dataの型:', typeof result.visualization_data);
+            console.log('visualization_dataの構造:', JSON.stringify(result.visualization_data, null, 2));
+            console.log('table_dataの型:', typeof result.table_data);
+            console.log('table_dataの構造:', JSON.stringify(result.table_data, null, 2));
+            
+            // visualization_dataが配列でない場合は変換
+            if (result.visualization_data && !Array.isArray(result.visualization_data)) {
+                result.visualization_data = Object.values(result.visualization_data);
+                console.log('visualization_dataを配列に変換しました');
+            }
+            
             return result;
         } catch (error) {
             console.error('データ処理エラー詳細:', error);
