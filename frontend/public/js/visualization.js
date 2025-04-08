@@ -99,11 +99,12 @@ const Visualization = {
     
     // ビジュアライゼーションデータを設定する関数
     setVisualizationData(visualizationData) {
-        console.log('Visualization.setVisualizationData called');
+        console.log('[DEBUG] setVisualizationData called with data:', visualizationData);
         
         // データの前処理
         const processedData = this.preprocessVisualizationData(visualizationData);
         if (processedData.length === 0) {
+            console.warn('[DEBUG] No processed data available');
             return;
         }
         
@@ -111,27 +112,32 @@ const Visualization = {
         this.visualizationData = processedData;
         this.originalData = processedData;
         this.currentTimeIndex = 0;
+        console.log('[DEBUG] Data set successfully. Length:', processedData.length);
         
         // マップが初期化されていない場合は初期化
         if (!this.map) {
+            console.log('[DEBUG] Map not initialized, calling setupMapAndViz');
             this.setupMapAndViz('map-container', visualizationData);
         } else {
+            console.log('[DEBUG] Map already initialized, updating tracks');
             // マップが既に初期化されている場合は、トラックの描画のみ更新
             this.renderTracks();
             
             // マップの表示領域を調整
             requestAnimationFrame(() => {
                 if (!this.map) return;
+                console.log('[DEBUG] Invalidating map size');
                 this.map.invalidateSize();
                 
                 if (this.trackAPolyline && this.trackBPolyline) {
                     try {
                         const bounds = this.trackAPolyline.getBounds().extend(this.trackBPolyline.getBounds());
                         if (bounds.isValid()) {
+                            console.log('[DEBUG] Fitting map to track bounds');
                             this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
                         }
                     } catch (e) {
-                        console.error('Error fitting bounds:', e);
+                        console.error('[DEBUG] Error fitting bounds:', e);
                     }
                 }
                 
@@ -143,69 +149,52 @@ const Visualization = {
     
     // マップとビジュアライゼーションのセットアップ
     setupMapAndViz(containerId, visualizationData, tableData) {
-        console.log('Visualization.setupMapAndViz called');
+        console.log('[DEBUG] setupMapAndViz called');
 
         try {
             if (this.map) {
-                console.log('Map already initialized. Removing existing map.');
+                console.log('[DEBUG] Removing existing map');
                 this.map.remove();
                 this.map = null;
             }
 
-            console.log('Initializing Leaflet map...');
-            
+            const mapContainer = document.getElementById(containerId);
+            if (!mapContainer) {
+                console.error('[DEBUG] Map container not found:', containerId);
+                return;
+            }
+
+            // マップの初期化
             this.map = L.map(containerId, {
-                center: [35.6895, 139.6917],  // 東京
-                zoom: 13,
-                zoomControl: false,
-                attributionControl: true
+                center: [35.6895, 139.6917],
+                zoom: 13
             });
-            
-            // 通常の地図スタイル（明るい）
-            const standardMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                maxZoom: 19
-            });
-            
-            // 衛星画像
-            const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-                maxZoom: 19
-            });
-            
-            // デフォルトの地図スタイルを設定
-            standardMap.addTo(this.map);
-            
-            // 地図のベースレイヤー
-            this.baseLayers = {
-                "標準地図": standardMap,
-                "衛星画像": satelliteMap
-            };
-            
-            this.currentBaseLayer = standardMap;
-            
-            L.control.attribution({
-                position: 'bottomright'
-            }).addTo(this.map);
-            
-            const tileLayerUrl = CONFIG.MAP.TILE_LAYERS.STANDARD.url;
-            const tileLayerOptions = {
-                attribution: CONFIG.MAP.TILE_LAYERS.STANDARD.attribution,
+
+            // 標準地図レイヤー
+            this.standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
-                minZoom: 5,
-                crossOrigin: true
-            };
-            L.tileLayer(tileLayerUrl, tileLayerOptions).addTo(this.map);
-
-            this.map.on('layeradd', (e) => {
-                if (e.layer instanceof L.TileLayer) {
-                    e.layer.on('loading', () => this.showMapLoadingIndicator());
-                    e.layer.on('load', () => this.hideMapLoadingIndicator());
-                }
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             });
-            console.log('Map initialized.');
 
-            // イベントリスナーの初期化（次の処理の前に）
+            // 衛星画像レイヤー
+            this.satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            });
+
+            // デフォルトレイヤーを追加
+            this.currentLayer = this.standardLayer;
+            this.currentLayer.addTo(this.map);
+
+            // ボタンのテキストを設定（イベントリスナーは追加しない）
+            const mapStyleBtn = document.getElementById('map-style-toggle');
+            if (mapStyleBtn) {
+                mapStyleBtn.textContent = "衛星画像に切り替え";
+            }
+
+            console.log('[DEBUG] Map initialized with standard layer');
+
+            // イベントリスナーの初期化（マップスタイル切り替えは除外）
             this.initEventListeners();
             console.log('Event listeners initialized.');
 
@@ -282,6 +271,19 @@ const Visualization = {
     initEventListeners() {
         console.log('Initializing event listeners');
         
+        // マップスタイル切り替えボタンのイベントリスナー（一度だけ登録）
+        const mapStyleBtn = document.getElementById('map-style-toggle');
+        if (mapStyleBtn) {
+            // 既存のイベントリスナーを削除
+            const newMapStyleBtn = mapStyleBtn.cloneNode(true);
+            mapStyleBtn.parentNode.replaceChild(newMapStyleBtn, mapStyleBtn);
+            
+            // 新しいイベントリスナーを追加
+            newMapStyleBtn.addEventListener('click', () => {
+                this.toggleMapStyle();
+            });
+        }
+        
         // 再生ボタンのイベントリスナー
         const playBtn = document.getElementById('play-btn');
         if (playBtn) {
@@ -306,14 +308,6 @@ const Visualization = {
             speedSlider.addEventListener('input', (e) => {
                 console.log('Speed slider changed:', e.target.value);
                 this.setPlaybackSpeed(parseFloat(e.target.value));
-            });
-        }
-        
-        // マップスタイル切り替えボタンのイベントリスナー
-        const mapStyleBtn = document.getElementById('map-style-toggle');
-        if (mapStyleBtn) {
-            mapStyleBtn.addEventListener('click', () => {
-                this.toggleMapStyle();
             });
         }
         
@@ -483,33 +477,37 @@ const Visualization = {
     
     // トラック描画
     renderTracks() {
+        console.log('[DEBUG] renderTracks called');
         this.clearTracks();
 
         if (!this.map || !this.visualizationData || this.visualizationData.length === 0) {
-            console.error('Cannot render tracks: Map or data not ready.');
+            console.error('[DEBUG] Cannot render tracks: Map or data not ready. Map:', !!this.map, 'Data length:', this.visualizationData?.length);
             return;
         }
 
         try {
-            console.log('Processing track coordinates...');
+            console.log('[DEBUG] Processing track coordinates...');
             const trackAData = this.visualizationData.map(p => [p.track_a?.lat, p.track_a?.lon]).filter(p => p[0] != null && p[1] != null);
             const trackBData = this.visualizationData.map(p => [p.track_b?.lat, p.track_b?.lon]).filter(p => p[0] != null && p[1] != null);
 
+            console.log('[DEBUG] Track data processed:', {
+                trackAPoints: trackAData.length,
+                trackBPoints: trackBData.length
+            });
+
             if (trackAData.length === 0 && trackBData.length === 0) {
-                console.warn("No valid coordinates found to render tracks.");
+                console.warn("[DEBUG] No valid coordinates found to render tracks.");
                 return;
             }
 
-            console.log(`Found ${trackAData.length} points for Track A, ${trackBData.length} points for Track B`);
-
             // トラックAのポリライン
             if (trackAData.length > 0) {
+                console.log('[DEBUG] Adding Track A polyline');
                 this.trackAPolyline = L.polyline(trackAData, { 
                     color: '#ff6b6b', 
                     weight: 3,
                     opacity: 0.8
                 }).addTo(this.map);
-                console.log('Track A polyline added to map');
                 
                 // トラックAのマーカー（開始地点）
                 this.trackAMarker = L.marker(trackAData[0], { 
@@ -521,17 +519,17 @@ const Visualization = {
                         iconAnchor: [6, 6]
                     })
                 }).addTo(this.map);
-                console.log('Track A marker added at', trackAData[0]);
+                console.log('[DEBUG] Track A marker added at', trackAData[0]);
             }
             
             // トラックBのポリライン
             if (trackBData.length > 0) {
+                console.log('[DEBUG] Adding Track B polyline');
                 this.trackBPolyline = L.polyline(trackBData, { 
                     color: '#4dabf7', 
                     weight: 3,
                     opacity: 0.8 
                 }).addTo(this.map);
-                console.log('Track B polyline added to map');
                 
                 // トラックBのマーカー（開始地点）
                 this.trackBMarker = L.marker(trackBData[0], { 
@@ -543,7 +541,7 @@ const Visualization = {
                         iconAnchor: [6, 6]
                     })
                 }).addTo(this.map);
-                console.log('Track B marker added at', trackBData[0]);
+                console.log('[DEBUG] Track B marker added at', trackBData[0]);
             }
             
             // ズームコントロールを追加
@@ -552,9 +550,9 @@ const Visualization = {
             // 情報オーバーレイを表示
             this.showInfoOverlay();
             
-            console.log('Tracks rendered successfully.');
+            console.log('[DEBUG] Tracks rendered successfully');
         } catch (e) {
-            console.error("Error rendering tracks:", e);
+            console.error("[DEBUG] Error rendering tracks:", e);
         }
     },
     
@@ -679,7 +677,8 @@ const Visualization = {
         const currentTimeEl = document.getElementById('current-time');
         if (currentTimeEl && currentData.timestamp) {
             const date = new Date(currentData.timestamp);
-            date.setTime(date.getTime() + (9 * 60 * 60 * 1000)); // UTCからJSTに変換
+            // UTCからJSTに変換（+9時間）
+            date.setTime(date.getTime() + (9 * 60 * 60 * 1000));
             
             const hours = date.getHours().toString().padStart(2, '0');
             const minutes = date.getMinutes().toString().padStart(2, '0');
@@ -936,15 +935,55 @@ const Visualization = {
     
     // マップスタイル切替
     toggleMapStyle() {
-        if (this.currentBaseLayer === this.baseLayers["標準地図"]) {
-            this.map.removeLayer(this.baseLayers["標準地図"]);
-            this.map.addLayer(this.baseLayers["衛星画像"]);
-            this.currentBaseLayer = this.baseLayers["衛星画像"];
-        } else {
-            this.map.removeLayer(this.baseLayers["衛星画像"]);
-            this.map.addLayer(this.baseLayers["標準地図"]);
-            this.currentBaseLayer = this.baseLayers["標準地図"];
+        console.log('[DEBUG] Toggling map style');
+        
+        if (!this.map) {
+            console.error('[DEBUG] Map not initialized');
+            return;
         }
+
+        const mapStyleBtn = document.getElementById('map-style-toggle');
+        
+        // 現在のレイヤーを確認して切り替え
+        if (this.currentLayer === this.standardLayer) {
+            // 標準地図から衛星画像に切り替え
+            this.map.removeLayer(this.standardLayer);
+            this.satelliteLayer.addTo(this.map);
+            this.currentLayer = this.satelliteLayer;
+            
+            if (mapStyleBtn) {
+                mapStyleBtn.textContent = "標準地図に切り替え";
+            }
+            console.log('[DEBUG] Switched to satellite map');
+
+            // レイヤーの状態を確認
+            console.log('[DEBUG] Current layers:', {
+                standard: this.map.hasLayer(this.standardLayer),
+                satellite: this.map.hasLayer(this.satelliteLayer)
+            });
+        } else {
+            // 衛星画像から標準地図に切り替え
+            this.map.removeLayer(this.satelliteLayer);
+            this.standardLayer.addTo(this.map);
+            this.currentLayer = this.standardLayer;
+            
+            if (mapStyleBtn) {
+                mapStyleBtn.textContent = "衛星画像に切り替え";
+            }
+            console.log('[DEBUG] Switched to standard map');
+
+            // レイヤーの状態を確認
+            console.log('[DEBUG] Current layers:', {
+                standard: this.map.hasLayer(this.standardLayer),
+                satellite: this.map.hasLayer(this.satelliteLayer)
+            });
+        }
+
+        // マップを再描画
+        requestAnimationFrame(() => {
+            this.map.invalidateSize();
+            console.log('[DEBUG] Map size invalidated and redrawn');
+        });
     },
     
     // カメラをリセット
@@ -2226,6 +2265,57 @@ const Visualization = {
             const startTime = this.visualizationData[0].timestamp;
             const currentTime = this.visualizationData[index].timestamp;
             this.elapsedTime = currentTime - startTime;
+        }
+    },
+
+    handleMapStyleToggle() {
+        // デバウンス処理を追加
+        if (this.isToggling) return;
+        this.isToggling = true;
+        
+        console.log('[DEBUG] Toggling map style', new Error().stack);
+        
+        if (!this.map) {
+            console.error('[DEBUG] Map not initialized');
+            this.isToggling = false;
+            return;
+        }
+
+        const mapStyleBtn = document.getElementById('map-style-toggle');
+        
+        try {
+            // 現在のレイヤーを確認して切り替え
+            if (this.currentLayer === this.standardLayer) {
+                // 標準地図から衛星画像に切り替え
+                this.map.removeLayer(this.standardLayer);
+                this.satelliteLayer.addTo(this.map);
+                this.currentLayer = this.satelliteLayer;
+                
+                if (mapStyleBtn) {
+                    mapStyleBtn.textContent = "標準地図に切り替え";
+                }
+                console.log('[DEBUG] Switched to satellite map', new Error().stack);
+            } else {
+                // 衛星画像から標準地図に切り替え
+                this.map.removeLayer(this.satelliteLayer);
+                this.standardLayer.addTo(this.map);
+                this.currentLayer = this.standardLayer;
+                
+                if (mapStyleBtn) {
+                    mapStyleBtn.textContent = "衛星画像に切り替え";
+                }
+                console.log('[DEBUG] Switched to standard map', new Error().stack);
+            }
+
+            // マップを再描画
+            this.map.invalidateSize();
+        } catch (error) {
+            console.error('[DEBUG] Error during map style toggle:', error);
+        } finally {
+            // 処理完了後にフラグをリセット
+            setTimeout(() => {
+                this.isToggling = false;
+            }, 300);
         }
     }
 }; 
