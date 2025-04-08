@@ -125,13 +125,7 @@ const API = {
             console.log('サーバーレスポンス:', response.status, response.statusText);
             
             if (!response.ok) {
-                let errorText = '';
-                try {
-                    const errorData = await response.json();
-                    errorText = errorData.detail || `サーバーエラー (${response.status})`;
-                } catch (jsonError) {
-                    errorText = await response.text() || `サーバーエラー (${response.status})`;
-                }
+                const errorText = `サーバーエラー (${response.status})`;
                 console.error('サンプルデータ読み込みエラー:', errorText);
                 throw new Error(errorText);
             }

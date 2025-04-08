@@ -663,43 +663,37 @@ const Visualization = {
     
     // 現在時刻の表示更新
     updateCurrentPointDisplay(index) {
-        if (!this.visualizationData || !this.visualizationData[index]) return;
+        if (!this.visualizationData || index >= this.visualizationData.length) return;
         
-        const currentData = this.visualizationData[index];
+        const data = this.visualizationData[index];
         
-        // テキストを設定するヘルパー関数
+        // ヘルパー関数: 値を指定された精度で表示
         const setText = (id, value, unit = '', precision = 1) => {
             const element = document.getElementById(id);
-            if (!element) return;
-            
-            if (value != null && !isNaN(value)) {
-                if (typeof precision === 'number') {
+            if (element) {
+                if (value != null && !isNaN(value)) {
                     element.textContent = value.toFixed(precision) + unit;
                 } else {
-                    element.textContent = value + unit;
+                    element.textContent = '-';
                 }
-            } else {
-                element.textContent = '-';
             }
         };
         
         // トラックAのデータ更新
-        if (currentData.track_a) {
-            setText('lat-a', currentData.track_a.lat, '', 6);
-            setText('lon-a', currentData.track_a.lon, '', 6);
-            setText('alt-a', currentData.track_a.altitude);
-        }
+        setText('alt-a', data.altitudeA, ' ft', 0);
+        setText('vspeed-a', data.verticalSpeedA, ' m/s', 2);
+        setText('vspeed-avg-a', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'A', 10), ' m/s', 2);
+        setText('vaccel-a', data.verticalAccelerationA, ' m/s²', 2);
         
         // トラックBのデータ更新
-        if (currentData.track_b) {
-            setText('lat-b', currentData.track_b.lat, '', 6);
-            setText('lon-b', currentData.track_b.lon, '', 6);
-            setText('alt-b', currentData.track_b.altitude);
-        }
+        setText('alt-b', data.altitudeB, ' ft', 0);
+        setText('vspeed-b', data.verticalSpeedB, ' m/s', 2);
+        setText('vspeed-avg-b', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'B', 10), ' m/s', 2);
+        setText('vaccel-b', data.verticalAccelerationB, ' m/s²', 2);
         
-        // 比較データの更新
-        setText('distance-3d', currentData.distance_3d);
-        setText('alt-diff', currentData.altitude_difference);
+        // 共通データの更新
+        setText('distance-3d', data.distance3D, ' m', 1);
+        setText('alt-diff', Math.abs(data.altitudeA - data.altitudeB), ' ft', 0);
     },
 
     // 過去n秒間の垂直速度平均を計算する関数
@@ -1753,11 +1747,14 @@ const Visualization = {
 
     // リサイズハンドラの設定 - シンプルな実装
     setupResizeHandler() {
+        console.log('Setting up resize handler');
         const resizeHandle = document.getElementById('resize-handle');
         const dataTableContainer = document.querySelector('.data-table-container');
+        const mapContainerWrapper = document.querySelector('.map-container-wrapper');
+        const visualizationSection = document.getElementById('visualization-section');
         
-        if (!resizeHandle || !dataTableContainer) {
-            console.warn('リサイズハンドルまたはテーブルコンテナが見つかりません');
+        if (!resizeHandle || !dataTableContainer || !mapContainerWrapper || !visualizationSection) {
+            console.warn('Required elements for resize not found');
             return;
         }
         
@@ -1765,36 +1762,79 @@ const Visualization = {
         let startY = 0;
         let startHeight = 0;
         
+        const updateMapSize = () => {
+            if (this.map) {
+                requestAnimationFrame(() => {
+                    this.map.invalidateSize();
+                    console.log('Map size updated after resize');
+                });
+            }
+        };
+        
         resizeHandle.addEventListener('mousedown', (e) => {
             isDragging = true;
             startY = e.clientY;
             startHeight = dataTableContainer.offsetHeight;
             document.body.style.cursor = 'row-resize';
             e.preventDefault();
+            console.log('Resize started');
         });
         
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
             
-            // 上にドラッグすると表が大きく、下にドラッグすると表が小さくなる
             const deltaY = startY - e.clientY;
-            const newHeight = Math.max(50, startHeight + deltaY); // 最小高さ50pxだけ確保
+            const containerHeight = visualizationSection.offsetHeight;
+            const newHeight = Math.max(0, Math.min(containerHeight - 50, startHeight + deltaY));
             
             dataTableContainer.style.height = `${newHeight}px`;
+            updateMapSize();
             
-            // マップのサイズを更新
-            this.onWindowResize();
+            console.log(`Table height adjusted to: ${newHeight}px`);
         });
         
         document.addEventListener('mouseup', () => {
             if (isDragging) {
                 isDragging = false;
                 document.body.style.cursor = '';
-                this.onWindowResize();
+                updateMapSize();
+                console.log('Resize completed');
             }
         });
         
-        console.log('リサイズハンドルの初期化が完了しました');
+        // タッチデバイスのサポート
+        resizeHandle.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            startY = e.touches[0].clientY;
+            startHeight = dataTableContainer.offsetHeight;
+            e.preventDefault();
+            console.log('Touch resize started');
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaY = startY - e.touches[0].clientY;
+            const containerHeight = visualizationSection.offsetHeight;
+            const newHeight = Math.max(0, Math.min(containerHeight - 50, startHeight + deltaY));
+            
+            dataTableContainer.style.height = `${newHeight}px`;
+            updateMapSize();
+            
+            console.log(`Table height adjusted to: ${newHeight}px (touch)`);
+        });
+        
+        document.addEventListener('touchend', () => {
+            if (isDragging) {
+                isDragging = false;
+                updateMapSize();
+                console.log('Touch resize completed');
+            }
+        });
+        
+        // 初期状態でマップサイズを更新
+        updateMapSize();
+        console.log('Resize handler setup completed');
     },
 
     // シンプルなタイムバーのリスナー初期化

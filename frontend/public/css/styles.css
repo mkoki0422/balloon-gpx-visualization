@@ -215,11 +215,18 @@ button:active {
     gap: 10px;
 }
 
-/* マップコンテナのスタイル */
+.map-container-wrapper {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 #map-container {
     position: relative;
-    flex: 2;
-    min-height: 300px;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
     border-radius: 12px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
@@ -318,97 +325,81 @@ button:active {
 /* 情報オーバーレイのスタイル */
 #info-overlay {
     position: absolute;
-    top: 15px;
-    right: 15px;
-    width: 340px;
-    background-color: rgba(30, 41, 59, 0.9);
-    padding: 16px;
-    border-radius: 16px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    z-index: 1000;
-    color: #fff;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    display: block !important;
-    pointer-events: auto;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-#info-overlay:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-}
-
-/* タイムバーのスタイル */
-.time-bar-container {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
+    top: 20px;
+    right: 20px;
     background-color: rgba(30, 41, 59, 0.85);
     backdrop-filter: blur(8px);
-    padding: 8px 15px;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    border-radius: 12px;
+    color: white;
+    font-size: 14px;
     z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    min-width: 280px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-top: none;
 }
 
-.time-bar-header {
-    margin-bottom: 4px;
+.tracks-container {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    justify-content: space-between;
 }
 
-.time-labels {
+.track-info {
+    flex: 1;
+}
+
+.track-info h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #4dabf7;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.track-info.track-a h3 {
+    color: #4CAF50;
+}
+
+.track-info.track-b h3 {
+    color: #f59f00;
+}
+
+.data-row {
     display: flex;
     justify-content: space-between;
-    color: #ffffff;
-    font-size: 12px;
-    margin-bottom: 4px;
-    font-family: 'Inter', sans-serif;
+    align-items: center;
+    margin: 4px 0;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
 }
 
-.time-slider {
-    position: relative;
-    width: 100%;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-    cursor: pointer;
-    margin: 8px 0 4px;
+.data-row span {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    margin-left: 8px;
+    color: white;
 }
 
-.time-progress {
-    position: absolute;
-    height: 100%;
-    background: #4dabf7;
-    border-radius: 3px;
-    transition: width 0.1s ease;
+.comparison-data {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.time-thumb {
-    position: absolute;
-    top: 50%;
-    width: 16px;
-    height: 16px;
-    background: #ffffff;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    cursor: grab;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+.comparison-data .data-row {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
 }
 
-.time-thumb:hover, .time-thumb:active {
-    transform: translate(-50%, -50%) scale(1.2);
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+.comparison-data .data-row span {
+    color: #4dabf7;
 }
 
 /* データテーブルのスタイル */
 .data-table-container {
-    flex: 1;
-    min-height: 200px;
+    position: relative;
     background: rgba(23, 32, 42, 0.9);
     border-radius: 12px;
     padding: 15px;
@@ -418,11 +409,14 @@ button:active {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: height 0.1s ease;
+    height: 300px; /* 初期値 */
 }
 
 .table-container {
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.2);
 }
@@ -959,4 +953,69 @@ input[type="file"]:hover {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(3px);
     -webkit-backdrop-filter: blur(3px);
+}
+
+/* タイムバーのスタイル */
+.time-bar-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(30, 41, 59, 0.85);
+    backdrop-filter: blur(8px);
+    padding: 8px 15px;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: none;
+}
+
+.time-bar-header {
+    margin-bottom: 4px;
+}
+
+.time-labels {
+    display: flex;
+    justify-content: space-between;
+    color: #ffffff;
+    font-size: 12px;
+    margin-bottom: 4px;
+    font-family: 'Inter', sans-serif;
+}
+
+.time-slider {
+    position: relative;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    cursor: pointer;
+    margin: 8px 0 4px;
+}
+
+.time-progress {
+    position: absolute;
+    height: 100%;
+    background: #4dabf7;
+    border-radius: 3px;
+    transition: width 0.1s ease;
+}
+
+.time-thumb {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    background: #ffffff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    cursor: grab;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.time-thumb:hover, .time-thumb:active {
+    transform: translate(-50%, -50%) scale(1.2);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
 } 
