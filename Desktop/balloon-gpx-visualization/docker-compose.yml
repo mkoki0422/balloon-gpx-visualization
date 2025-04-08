@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend/public:/usr/share/nginx/html
+    depends_on:
+      - backend
+    networks:
+      - gpx-network
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    networks:
+      - gpx-network
+
+networks:
+  gpx-network:
+    driver: bridge 
