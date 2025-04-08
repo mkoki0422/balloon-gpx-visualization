@@ -569,8 +569,11 @@ const Visualization = {
             const avgVSpeedA = this.calculateAverageVerticalSpeed(this.visualizationData, index, 'a', 10);
             const avgVSpeedB = this.calculateAverageVerticalSpeed(this.visualizationData, index, 'b', 10);
 
+            // 時刻をJSTに変換して表示
+            const timeStr = this.formatTime(this.visualizationData[index].timestamp);
+
             tr.innerHTML = `
-                <td>${row.time || '-'}</td>
+                <td>${timeStr}</td>
                 <td>${getValue(row.ele_a_ft, 1)}</td>
                 <td>${getValue(row.ele_b_ft, 1)}</td>
                 <td>${getValue(row.height_diff_ft, 1)}</td>
@@ -701,7 +704,7 @@ const Visualization = {
         
         // トラックAのデータ更新
         if (data.track_a) {
-            setText('alt-a', data.track_a.alt, ' ft', 0);
+            setText('alt-a', data.track_a.ele_ft, ' ft', 0);
             setText('vspeed-a', data.track_a.speeds?.vertical, ' m/s', 2);
             setText('vspeed-avg-a', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'a', 10), ' m/s', 2);
             setText('vaccel-a', data.track_a.accelerations?.vertical, ' m/s²', 2);
@@ -709,16 +712,15 @@ const Visualization = {
         
         // トラックBのデータ更新
         if (data.track_b) {
-            setText('alt-b', data.track_b.alt, ' ft', 0);
+            setText('alt-b', data.track_b.ele_ft, ' ft', 0);
             setText('vspeed-b', data.track_b.speeds?.vertical, ' m/s', 2);
             setText('vspeed-avg-b', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'b', 10), ' m/s', 2);
             setText('vaccel-b', data.track_b.accelerations?.vertical, ' m/s²', 2);
         }
         
         // 共通データの更新
-        setText('distance-3d', data.distance3D, ' m', 1);
-        setText('alt-diff', data.track_a && data.track_b ? 
-            Math.abs((data.track_a.alt || 0) - (data.track_b.alt || 0)) : null, ' ft', 0);
+        setText('distance-3d', data.comparison?.distance_3d, ' m', 1);
+        setText('alt-diff', data.comparison?.height_diff_ft, ' ft', 0);
         
         // 現在の時刻表示を更新（JSTに変換）
         const currentTimeDisplay = document.getElementById('current-time-display');
@@ -2471,10 +2473,13 @@ const Visualization = {
         const date = new Date(timestamp);
         // UTCからJST(+9時間)に変換
         const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+        const year = jstDate.getUTCFullYear();
+        const month = (jstDate.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = jstDate.getUTCDate().toString().padStart(2, '0');
         const hours = jstDate.getUTCHours().toString().padStart(2, '0');
         const minutes = jstDate.getUTCMinutes().toString().padStart(2, '0');
         const seconds = jstDate.getUTCSeconds().toString().padStart(2, '0');
-        return `${hours}:${minutes}:${seconds}`;
+        return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
     },
 
     play() {
