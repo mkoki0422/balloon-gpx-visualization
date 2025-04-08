@@ -165,9 +165,11 @@ const Visualization = {
             }
 
             // マップの初期化
-            this.map = L.map(containerId, {
+            this.map = L.map('map', {
                 center: [35.6895, 139.6917],
-                zoom: 13
+                zoom: 13,
+                zoomControl: false,  // ズームコントロールを無効化
+                scrollWheelZoom: true
             });
 
             // 標準地図レイヤー
@@ -438,7 +440,7 @@ const Visualization = {
             if (trackAData.length > 0) {
                 console.log('[DEBUG] Adding Track A polyline');
                 this.trackAPolyline = L.polyline(trackAData, { 
-                    color: '#ff6b6b', 
+                    color: '#ef4444',
                     weight: 3,
                     opacity: 0.8
                 }).addTo(this.map);
@@ -460,9 +462,9 @@ const Visualization = {
             if (trackBData.length > 0) {
                 console.log('[DEBUG] Adding Track B polyline');
                 this.trackBPolyline = L.polyline(trackBData, { 
-                    color: '#4dabf7', 
+                    color: '#3b82f6',
                     weight: 3,
-                    opacity: 0.8 
+                    opacity: 0.8
                 }).addTo(this.map);
                 
                 // トラックBのマーカー（開始地点）
@@ -492,22 +494,8 @@ const Visualization = {
     
     // ズームコントロールを追加
     addZoomControl() {
-        if (!this.map) return;
-        
-        // 既存のズームコントロールを確認
-        let hasZoomControl = false;
-        this.map.eachLayer(layer => {
-            if (layer instanceof L.Control.Zoom) {
-                hasZoomControl = true;
-            }
-        });
-        
-        if (!hasZoomControl) {
-            console.log('Adding zoom controls to map');
-            L.control.zoom({
-                position: 'bottomright'
-            }).addTo(this.map);
-        }
+        // ズームコントロールは無効化されているため、何もしない
+        console.log('Zoom controls are disabled');
     },
     
     // 情報オーバーレイを表示
