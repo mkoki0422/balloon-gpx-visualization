@@ -1047,18 +1047,19 @@ const Visualization = {
 
         if (!this.lastTimestamp) {
             this.lastTimestamp = timestamp;
+            this.elapsedTime = 0;
         }
 
         const deltaTime = timestamp - this.lastTimestamp;
         this.lastTimestamp = timestamp;
 
         // 経過時間を更新（再生速度を考慮）
-        this.elapsedTime += (deltaTime * this.playbackSpeed);
+        this.elapsedTime += deltaTime;
 
-        // 次のインデックスを計算
-        const timeIncrement = (deltaTime * this.playbackSpeed) / this.timeStep;
+        // 1秒あたりのインデックス増加量を計算
+        const secondsElapsed = this.elapsedTime / 1000; // ミリ秒を秒に変換
         const newIndex = Math.min(
-            Math.floor(this.currentTimeIndex + timeIncrement),
+            Math.floor(secondsElapsed * this.playbackSpeed),
             this.visualizationData.length - 1
         );
 
@@ -1067,6 +1068,7 @@ const Visualization = {
             // 最後まで到達したら最初に戻る
             this.currentTimeIndex = 0;
             this.elapsedTime = 0;
+            this.lastTimestamp = timestamp;
         } else {
             this.currentTimeIndex = newIndex;
         }
