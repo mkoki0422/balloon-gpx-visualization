@@ -5,8 +5,12 @@ const Visualization = {
     visualizationData: null,
     currentMapStyle: 'STANDARD',
     isPlaying: false,
-    animationSpeed: CONFIG.VISUALIZATION.ANIMATION_SPEED,
+    playbackSpeed: 1.0,
     currentTimeIndex: 0,
+    timeStep: 100, // 100ミリ秒ごとに更新
+    elapsedTime: 0,
+    lastTimestamp: 0,
+    animationTimer: null,
     trackAMarker: null,
     trackBMarker: null,
     trackAPolyline: null,
@@ -15,9 +19,6 @@ const Visualization = {
     trackBInfo: null,
     originalData: null,
     tableData: null,
-    animationTimer: null,
-    lastTimestamp: 0,
-    timeAccumulator: 0,
     lastInfoData: null,
     lastHighlightedIndex: null,
     lastTimelinePercentage: null,
@@ -330,53 +331,66 @@ const Visualization = {
     
     // コントロールのイベントリスナーをセットアップ
     initControlListeners() {
-        console.log('[DEBUG] Setting up control listeners');
-        
-        // 既存のコントロールコンテナがあれば削除
-        let existingControls = document.querySelector('.controls');
-        if (existingControls) {
-            existingControls.remove();
-        }
-        
-        // コントロールコンテナを作成
-        const controlsContainer = document.createElement('div');
-        controlsContainer.className = 'controls map-overlay-base';
-        document.getElementById('map-container').appendChild(controlsContainer);
-        
-        // マップコントロール
-        const mapControls = document.createElement('div');
-        mapControls.className = 'map-controls';
-        
-        // マップスタイル切り替えボタン
-        const toggleStyleBtn = document.createElement('button');
-        toggleStyleBtn.id = 'map-style-toggle';
-        toggleStyleBtn.className = 'map-control-button';
-        toggleStyleBtn.textContent = "衛星画像に切り替え";
-        toggleStyleBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.toggleMapStyle();
-        });
-        
-        // カメラリセットボタン
-        const resetCameraBtn = document.createElement('button');
-        resetCameraBtn.id = 'reset-camera';
-        resetCameraBtn.className = 'map-control-button';
-        resetCameraBtn.textContent = "カメラリセット";
-        resetCameraBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.resetCamera();
-        });
-        
-        mapControls.appendChild(toggleStyleBtn);
-        mapControls.appendChild(resetCameraBtn);
-        controlsContainer.appendChild(mapControls);
+        console.log('[DEBUG] Initializing control listeners');
 
-        // アニメーションコントロール
-        const animationControls = document.createElement('div');
-        animationControls.className = 'animation-controls';
-        controlsContainer.appendChild(animationControls);
-        
-        console.log('[DEBUG] Control listeners setup complete');
+        // Map style toggle
+        const mapStyleButton = document.getElementById('map-style-button');
+        if (mapStyleButton) {
+            mapStyleButton.addEventListener('click', () => {
+                console.log('[DEBUG] Map style button clicked');
+                this.toggleMapStyle();
+            });
+        } else {
+            console.warn('[DEBUG] Map style button not found');
+        }
+
+        // Reset camera
+        const resetCameraButton = document.getElementById('reset-camera-button');
+        if (resetCameraButton) {
+            resetCameraButton.addEventListener('click', () => {
+                console.log('[DEBUG] Reset camera button clicked');
+                this.resetCamera();
+            });
+        } else {
+            console.warn('[DEBUG] Reset camera button not found');
+        }
+
+        // Play/Pause
+        const playButton = document.getElementById('play-button');
+        if (playButton) {
+            playButton.addEventListener('click', () => {
+                console.log('[DEBUG] Play button clicked');
+                this.togglePlayback();
+            });
+        } else {
+            console.warn('[DEBUG] Play button not found');
+        }
+
+        // Reset time
+        const resetTimeButton = document.getElementById('reset-time-button');
+        if (resetTimeButton) {
+            resetTimeButton.addEventListener('click', () => {
+                console.log('[DEBUG] Reset time button clicked');
+                this.resetTime();
+            });
+        } else {
+            console.warn('[DEBUG] Reset time button not found');
+        }
+
+        // Speed control
+        const speedSlider = document.getElementById('speed-slider');
+        if (speedSlider) {
+            speedSlider.addEventListener('input', (event) => {
+                const speed = parseFloat(event.target.value);
+                console.log('[DEBUG] Speed slider changed:', speed);
+                this.setSpeed(speed);
+            });
+            
+            // Set initial speed
+            this.setSpeed(1.0);
+        } else {
+            console.warn('[DEBUG] Speed slider not found');
+        }
     },
     
     // すべての子要素にイベント伝播を防止するリスナーを追加する関数
@@ -918,32 +932,17 @@ const Visualization = {
     
     // 再生/一時停止を切り替える
     togglePlayback() {
-        console.log('[DEBUG] Toggle playback called. Current state:', {
+        console.log('[DEBUG] Toggle playback:', {
             isPlaying: this.isPlaying,
-            hasData: this.visualizationData && this.visualizationData.length > 0,
-            currentTimeIndex: this.currentTimeIndex,
-            animationTimer: !!this.animationTimer
+            hasData: !!this.visualizationData,
+            currentIndex: this.currentTimeIndex
         });
-        
-        if (!this.visualizationData || this.visualizationData.length === 0) {
-            console.warn('[DEBUG] Cannot toggle playback: No visualization data available');
-            return;
-        }
 
         if (this.isPlaying) {
             this.pause();
         } else {
             this.play();
         }
-
-        // ボタンの状態を更新
-        this.updatePlayButtonState();
-        
-        console.log('[DEBUG] After toggle:', {
-            isPlaying: this.isPlaying,
-            currentTimeIndex: this.currentTimeIndex,
-            animationTimer: !!this.animationTimer
-        });
     },
     
     // 再生ボタンの状態を更新
@@ -963,20 +962,55 @@ const Visualization = {
     // アニメーションを開始
     startAnimation() {
         if (!this.animationTimer) {
-            console.log('[DEBUG] Animation starting...');
-            this.lastTimestamp = performance.now();
-            this.timeAccumulator = 0;
+            console.log('[DEBUG] Starting animation loop');
             this.animationTimer = requestAnimationFrame(this.animate.bind(this));
         }
     },
-    
-    // アニメーションを停止
+
     stopAnimation() {
         if (this.animationTimer) {
-            console.log('[DEBUG] Animation stopping...');
+            console.log('[DEBUG] Stopping animation');
             cancelAnimationFrame(this.animationTimer);
             this.animationTimer = null;
         }
+    },
+
+    animate(timestamp) {
+        if (!this.isPlaying) {
+            console.log('[DEBUG] Animation stopped');
+            this.stopAnimation();
+            return;
+        }
+
+        if (!this.lastTimestamp) {
+            this.lastTimestamp = timestamp;
+        }
+
+        const deltaTime = timestamp - this.lastTimestamp;
+        this.lastTimestamp = timestamp;
+
+        // 経過時間を更新（再生速度を考慮）
+        this.elapsedTime += (deltaTime * this.playbackSpeed);
+
+        // 次のインデックスを計算
+        const newIndex = Math.floor(this.currentTimeIndex + (deltaTime * this.playbackSpeed / this.timeStep));
+
+        // データの範囲をチェック
+        if (newIndex >= this.visualizationData.length) {
+            // 最後まで到達したら最初に戻る
+            this.currentTimeIndex = 0;
+            this.elapsedTime = 0;
+        } else {
+            this.currentTimeIndex = newIndex;
+        }
+
+        // 表示を更新
+        this.updateDisplay(this.currentTimeIndex);
+        this.updateTimelineProgress();
+        this.updateMarkerPositions();
+
+        // アニメーションを継続
+        this.animationTimer = requestAnimationFrame(this.animate.bind(this));
     },
     
     // 再生をリセット
@@ -995,211 +1029,14 @@ const Visualization = {
     
     // 再生速度を設定
     setPlaybackSpeed(speed) {
-        // 速度を1倍から10倍の範囲に制限
-        this.animationSpeed = Math.max(1, Math.min(10, speed));
+        this.playbackSpeed = Math.max(0.1, Math.min(10.0, speed));
+        console.log(`[DEBUG] Playback speed set to ${this.playbackSpeed}x`);
         
-        // 速度表示を更新
-        const speedDisplay = document.getElementById('speed-display');
-        if (speedDisplay) {
-            speedDisplay.textContent = `${this.animationSpeed.toFixed(1)}x`;
-        }
-    },
-    
-    // アニメーションフレームを処理
-    animate(timestamp) {
-        if (!this.isPlaying || !this.visualizationData || this.visualizationData.length === 0) {
-            console.log('[DEBUG] Animation stopped:', {
-                isPlaying: this.isPlaying,
-                hasData: !!this.visualizationData,
-                dataLength: this.visualizationData?.length
-            });
-            this.animationTimer = null;
-            return;
-        }
-
-        // 時間の更新
-        const deltaTime = timestamp - this.lastTimestamp;
-        this.lastTimestamp = timestamp;
-        
-        // アニメーション速度に応じて時間を蓄積
-        this.timeAccumulator += deltaTime * (this.animationSpeed || 1.0);
-        
-        // 一定間隔(33ms = 約30fps)でフレームを更新
-        const frameInterval = 33;
-        
-        while (this.timeAccumulator >= frameInterval) {
-            this.timeAccumulator -= frameInterval;
-            
-            // インデックスを進める
-            this.currentTimeIndex++;
-            
-            // 最後まで到達したら最初に戻る
-            if (this.currentTimeIndex >= this.visualizationData.length) {
-                this.currentTimeIndex = 0;
-            }
-            
-            // 現在のデータポイントを取得
-            const currentData = this.visualizationData[this.currentTimeIndex];
-            
-            try {
-                // マーカー位置の更新
-                if (currentData.track_a && this.trackAMarker) {
-                    const latA = currentData.track_a.lat;
-                    const lonA = currentData.track_a.lon;
-                    if (latA != null && lonA != null) {
-                        this.trackAMarker.setLatLng([latA, lonA]);
-                    }
-                }
-                
-                if (currentData.track_b && this.trackBMarker) {
-                    const latB = currentData.track_b.lat;
-                    const lonB = currentData.track_b.lon;
-                    if (latB != null && lonB != null) {
-                        this.trackBMarker.setLatLng([latB, lonB]);
-                    }
-                }
-
-                // 情報オーバーレイの更新
-                if (currentData.track_a) {
-                    const latEl = document.getElementById('lat-a');
-                    const lonEl = document.getElementById('lon-a');
-                    const altEl = document.getElementById('alt-a');
-                    if (latEl) latEl.textContent = currentData.track_a.lat?.toFixed(6) || '-';
-                    if (lonEl) lonEl.textContent = currentData.track_a.lon?.toFixed(6) || '-';
-                    if (altEl) altEl.textContent = currentData.track_a.altitude?.toFixed(1) || '-';
-                }
-                
-                if (currentData.track_b) {
-                    const latEl = document.getElementById('lat-b');
-                    const lonEl = document.getElementById('lon-b');
-                    const altEl = document.getElementById('alt-b');
-                    if (latEl) latEl.textContent = currentData.track_b.lat?.toFixed(6) || '-';
-                    if (lonEl) lonEl.textContent = currentData.track_b.lon?.toFixed(6) || '-';
-                    if (altEl) altEl.textContent = currentData.track_b.altitude?.toFixed(1) || '-';
-                }
-
-                // 比較データの更新
-                const distance3dEl = document.getElementById('distance-3d');
-                const altDiffEl = document.getElementById('alt-diff');
-                if (distance3dEl) distance3dEl.textContent = currentData.distance_3d?.toFixed(1) || '-';
-                if (altDiffEl) altDiffEl.textContent = currentData.altitude_difference?.toFixed(1) || '-';
-                
-                // タイムラインと時刻表示の更新
-                const percentage = this.currentTimeIndex / (this.visualizationData.length - 1);
-                const percentStr = `${percentage * 100}%`;
-                
-                // メインタイムラインの更新
-                const timelineProgress = document.querySelector('.timeline-progress');
-                const timelineThumb = document.querySelector('.timeline-thumb');
-                if (timelineProgress && timelineThumb) {
-                    timelineProgress.style.width = percentStr;
-                    timelineThumb.style.left = percentStr;
-                }
-
-                // 補足時間バーの更新
-                const timeProgress = document.querySelector('.time-progress');
-                const timeThumb = document.querySelector('.time-thumb');
-                if (timeProgress && timeThumb) {
-                    timeProgress.style.width = percentStr;
-                    timeThumb.style.left = percentStr;
-                }
-                
-                // 時刻表示の更新（1秒ごと）
-                if (this.timeAccumulator % 1000 < frameInterval && currentData.timestamp) {
-                    const date = new Date(currentData.timestamp);
-                    const hours = date.getUTCHours().toString().padStart(2, '0');
-                    const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-                    const seconds = date.getUTCSeconds().toString().padStart(2, '0');
-                    const timeStr = `${hours}:${minutes}:${seconds}`;
-
-                    // メインの時刻表示を更新
-                    const currentTimeEl = document.getElementById('current-time');
-                    if (currentTimeEl) {
-                        currentTimeEl.textContent = timeStr;
-                    }
-
-                    // 補足時間バーの時刻表示を更新
-                    const currentTimeDisplay = document.getElementById('current-time-display');
-                    if (currentTimeDisplay) {
-                        currentTimeDisplay.textContent = timeStr;
-                    }
-                }
-                
-            } catch (error) {
-                console.error('[DEBUG] Error updating animation:', error);
-                this.stopAnimation();
-                return;
-            }
-        }
-        
-        // 次のフレームをリクエスト
-        this.animationTimer = requestAnimationFrame(this.animate.bind(this));
-    },
-    
-    // アニメーションの再生
-    play() {
-        console.log('[DEBUG] Play called. Current state:', {
-            isPlaying: this.isPlaying,
-            currentTimeIndex: this.currentTimeIndex,
-            animationTimer: !!this.animationTimer
-        });
-        
-        if (!this.visualizationData || this.visualizationData.length === 0) {
-            console.warn('[DEBUG] Cannot play: No visualization data available');
-            return;
-        }
-        
-        this.isPlaying = true;
-        this.startAnimation();
-        
-        console.log('[DEBUG] Playback started. New state:', {
-            isPlaying: this.isPlaying,
-            currentTimeIndex: this.currentTimeIndex,
-            animationTimer: !!this.animationTimer
-        });
-    },
-    
-    // アニメーション一時停止
-    pause() {
-        console.log('[DEBUG] Pause called. Current state:', {
-            isPlaying: this.isPlaying,
-            currentTimeIndex: this.currentTimeIndex,
-            animationTimer: !!this.animationTimer
-        });
-        
-        this.isPlaying = false;
-        this.stopAnimation();
-        
-        console.log('[DEBUG] Playback paused. New state:', {
-            isPlaying: this.isPlaying,
-            currentTimeIndex: this.currentTimeIndex,
-            animationTimer: !!this.animationTimer
-        });
-    },
-    
-    // 再生速度設定
-    setSpeed(speed) {
-        if (!speed || isNaN(speed) || speed < 1) {
-            speed = 1.0;
-        } else if (speed > 10) {
-            speed = 10.0;
-        }
-        
-        this.animationSpeed = speed;
-        
-        // スライダーの値を更新
-        const speedSlider = document.getElementById('speed-slider');
-        if (speedSlider) {
-            speedSlider.value = speed;
-        }
-        
-        // 速度表示を更新
+        // スピード表示を更新
         const speedValue = document.getElementById('speed-value');
         if (speedValue) {
-            speedValue.innerText = speed.toFixed(1) + 'x';
+            speedValue.textContent = this.playbackSpeed.toFixed(1) + 'x';
         }
-        
-        console.log(`再生速度を ${speed}x に設定しました`);
     },
     
     // アニメーションの更新ロジック
@@ -1218,12 +1055,12 @@ const Visualization = {
         this.lastTimestamp = timestamp;
         
         // 速度に応じた時間の蓄積
-        this.timeAccumulator += deltaTime * this.animationSpeed;
+        this.elapsedTime += deltaTime * this.playbackSpeed;
         
         // 一定時間ごとに位置を更新
         const timeStep = 100; // 100msごとに更新
-        if (this.timeAccumulator >= timeStep) {
-            this.timeAccumulator -= timeStep;
+        if (this.elapsedTime >= timeStep) {
+            this.elapsedTime -= timeStep;
             
             // 次の時間インデックスへ進める
             this.currentTimeIndex++;
@@ -2003,7 +1840,7 @@ const Visualization = {
         
         // アニメーションタイマーのセットアップ
         this.lastTimestamp = 0;
-        this.timeAccumulator = 0;
+        this.elapsedTime = 0;
         
         try {
             // タイムバーのドラッグ機能を設定
@@ -2435,5 +2272,36 @@ const Visualization = {
         const minutes = date.getUTCMinutes().toString().padStart(2, '0');
         const seconds = date.getUTCSeconds().toString().padStart(2, '0');
         return `${hours}:${minutes}:${seconds}`;
+    },
+
+    play() {
+        if (!this.visualizationData || this.visualizationData.length === 0) {
+            console.warn('[DEBUG] Cannot play: No visualization data');
+            return;
+        }
+        
+        console.log('[DEBUG] Starting playback');
+        this.isPlaying = true;
+        this.lastTimestamp = performance.now();
+        this.updatePlayButtonState();
+        this.startAnimation();
+    },
+
+    pause() {
+        console.log('[DEBUG] Pausing playback');
+        this.isPlaying = false;
+        this.stopAnimation();
+        this.updatePlayButtonState();
+    },
+
+    setSpeed(speed) {
+        this.playbackSpeed = Math.max(0.1, Math.min(10.0, speed));
+        console.log(`[DEBUG] Playback speed set to ${this.playbackSpeed}x`);
+        
+        // スピード表示を更新
+        const speedValue = document.getElementById('speed-value');
+        if (speedValue) {
+            speedValue.textContent = this.playbackSpeed.toFixed(1) + 'x';
+        }
     }
 }; 
