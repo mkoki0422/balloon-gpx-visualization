@@ -351,28 +351,34 @@ function setupEventListeners() {
 }
 
 function updateTimeRange(data) {
-    // UTC日時を表示するためのフォーマット関数
+    // 時刻をフォーマットする関数
     function formatDateTime(timestamp) {
+        if (!timestamp) return '00:00:00';
+        
         const date = new Date(timestamp);
         // UTCからJSTに変換（+9時間）
-        date.setTime(date.getTime() + (9 * 60 * 60 * 1000));
+        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
         
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        const seconds = date.getSeconds().toString().padStart(2, '0');
+        const hours = jstDate.getUTCHours().toString().padStart(2, '0');
+        const minutes = jstDate.getUTCMinutes().toString().padStart(2, '0');
+        const seconds = jstDate.getUTCSeconds().toString().padStart(2, '0');
         return `${hours}:${minutes}:${seconds}`;
     }
+
+    console.log('時刻範囲を更新:', data);
 
     // 各要素の存在確認をしてから値を設定
     const startTimeEl = document.getElementById('start-time');
     const endTimeEl = document.getElementById('end-time');
+    const currentTimeDisplayEl = document.getElementById('current-time-display');
     const selectedStartTimeEl = document.getElementById('selected-start-time');
     const selectedEndTimeEl = document.getElementById('selected-end-time');
     
     if (startTimeEl) startTimeEl.textContent = formatDateTime(data.startTime);
     if (endTimeEl) endTimeEl.textContent = formatDateTime(data.endTime);
+    if (currentTimeDisplayEl) currentTimeDisplayEl.textContent = formatDateTime(data.startTime);
     
-    // シンプルなタイムバーの場合は、選択範囲の表示は不要
+    // 選択範囲の表示（必要な場合）
     if (selectedStartTimeEl) selectedStartTimeEl.textContent = formatDateTime(data.startTime);
     if (selectedEndTimeEl) selectedEndTimeEl.textContent = formatDateTime(data.endTime);
 }
