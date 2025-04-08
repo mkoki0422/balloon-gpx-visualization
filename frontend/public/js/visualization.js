@@ -594,175 +594,53 @@ const Visualization = {
         console.log('Table populated.');
     },
     
-    // 表示更新
+    // 表示更新（すべての要素を一元的に更新）
     updateDisplay(index) {
         if (!this.visualizationData || index < 0 || index >= this.visualizationData.length) {
             console.warn(`Invalid index for updateDisplay: ${index}`);
             return;
         }
         
-        this.currentTimeIndex = index;
-        const currentData = this.visualizationData[index];
-        
-        if (!currentData) {
-            console.warn(`No data found at index: ${index}`);
-            return;
-        }
-
-        // マーカー位置の更新
-        if (currentData.track_a) {
-            const latA = currentData.track_a.lat;
-            const lonA = currentData.track_a.lon;
-            if (this.trackAMarker && latA != null && lonA != null) {
-                this.trackAMarker.setLatLng([latA, lonA]);
-            }
-        }
-
-        if (currentData.track_b) {
-            const latB = currentData.track_b.lat;
-            const lonB = currentData.track_b.lon;
-            if (this.trackBMarker && latB != null && lonB != null) {
-                this.trackBMarker.setLatLng([latB, lonB]);
-            }
-        }
-
-        // 情報オーバーレイの更新
-        this.updateCurrentPointDisplay(index);
-
-        // 現在の時刻表示を更新（JSTに変換）
-        const currentTimeEl = document.getElementById('current-time');
-        if (currentTimeEl && currentData.timestamp) {
-            const date = new Date(currentData.timestamp);
-            // UTCからJSTに変換（+9時間）
-            date.setTime(date.getTime() + (9 * 60 * 60 * 1000));
+        try {
+            console.log(`Updating display for index: ${index}`);
             
-            const hours = date.getHours().toString().padStart(2, '0');
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            const seconds = date.getSeconds().toString().padStart(2, '0');
-            currentTimeEl.textContent = `${hours}:${minutes}:${seconds}`;
-        }
-
-        // テーブル行のハイライトとタイムラインの更新
-        this.highlightTableRow(index);
-        this.updateCurrentTimeIndicator(index);
-    },
-    
-    // マーカーを強調表示（アニメーション）
-    pulseMarkers() {
-        // トラックAのマーカーを強調
-        if (this.trackAMarker) {
-            const markerEl = this.trackAMarker.getElement();
-            if (markerEl && !markerEl.classList.contains('pulse-effect')) {
-                markerEl.classList.add('pulse-effect');
+            // 現在のインデックスを更新
+            this.currentTimeIndex = index;
+            const currentData = this.visualizationData[index];
+            
+            if (!currentData) {
+                console.warn(`No data found at index: ${index}`);
+                return;
             }
+            
+            // 1. マーカー位置の更新
+            this.updateMarkerPositions();
+            
+            // 2. 情報オーバーレイの更新
+            this.updateCurrentPointDisplay(index);
+            
+            // 3. 現在の時刻表示を更新（JSTに変換）
+            this.updateTimeDisplay(index);
+            
+            // 4. タイムラインの進行状況を更新
+            this.updateTimelineProgress();
+            
+            // 5. テーブル行のハイライト
+            this.highlightTableRow(index);
+            
+            // 6. テーブルを自動スクロール（必要に応じて）
+            this.scrollTableToCurrentRow(index);
+            
+            console.log(`Display updated for index: ${index}`);
+        } catch (error) {
+            console.error('Error in updateDisplay:', error);
         }
-        
-        // トラックBのマーカーを強調
-        if (this.trackBMarker) {
-            const markerEl = this.trackBMarker.getElement();
-            if (markerEl && !markerEl.classList.contains('pulse-effect')) {
-                markerEl.classList.add('pulse-effect');
-            }
-        }
-    },
-    
-    // マーカーのアニメーションをリセット
-    resetMarkerAnimation() {
-        if (this.trackAMarker) {
-            const markerEl = this.trackAMarker.getElement();
-            if (markerEl) {
-                markerEl.classList.remove('pulse-effect');
-            }
-        }
-        
-        if (this.trackBMarker) {
-            const markerEl = this.trackBMarker.getElement();
-            if (markerEl) {
-                markerEl.classList.remove('pulse-effect');
-            }
-        }
-    },
-    
-    // 現在時刻の表示更新
-    updateCurrentPointDisplay(index) {
-        if (!this.visualizationData || index >= this.visualizationData.length) return;
-        
-        const data = this.visualizationData[index];
-        if (!data) return;
-        
-        // ヘルパー関数: 値を指定された精度で表示
-        const setText = (id, value, unit = '', precision = 1) => {
-            const element = document.getElementById(id);
-            if (element) {
-                if (value != null && !isNaN(value)) {
-                    element.textContent = value.toFixed(precision) + unit;
-                } else {
-                    element.textContent = '-';
-                }
-            }
-        };
-        
-        // トラックAのデータ更新
-        if (data.track_a) {
-            setText('alt-a', data.track_a.ele_ft, ' ft', 0);
-            setText('vspeed-a', data.track_a.speeds?.vertical, ' m/s', 2);
-            setText('vspeed-avg-a', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'a', 10), ' m/s', 2);
-            setText('vaccel-a', data.track_a.accelerations?.vertical, ' m/s²', 2);
-        }
-        
-        // トラックBのデータ更新
-        if (data.track_b) {
-            setText('alt-b', data.track_b.ele_ft, ' ft', 0);
-            setText('vspeed-b', data.track_b.speeds?.vertical, ' m/s', 2);
-            setText('vspeed-avg-b', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'b', 10), ' m/s', 2);
-            setText('vaccel-b', data.track_b.accelerations?.vertical, ' m/s²', 2);
-        }
-        
-        // 共通データの更新
-        setText('distance-3d', data.comparison?.distance_3d, ' m', 1);
-        setText('alt-diff', data.comparison?.height_diff_ft, ' ft', 0);
-        
-        // 現在の時刻表示を更新（JSTに変換）
-        const currentTimeDisplay = document.getElementById('current-time-display');
-        if (currentTimeDisplay && data.timestamp) {
-            const displayTime = this.formatTime(data.timestamp);
-            currentTimeDisplay.textContent = displayTime;
-        }
-    },
-
-    // 過去n秒間の垂直速度平均を計算する関数
-    calculateAverageVerticalSpeed(data, currentIndex, trackKey, seconds) {
-        if (!data || !data[currentIndex]) return null;
-        
-        const currentTime = data[currentIndex].timestamp;
-        if (!currentTime) return null;
-        
-        const targetTime = currentTime - (seconds * 1000); // n秒前の時間
-        
-        let startIndex = currentIndex;
-        // n秒前のデータポイントを探す
-        while (startIndex > 0 && data[startIndex].timestamp > targetTime) {
-            startIndex--;
-        }
-        
-        // 平均を計算するためのデータを収集
-        let sum = 0;
-        let count = 0;
-        
-        for (let i = startIndex; i <= currentIndex; i++) {
-            const item = data[i];
-            if (item && item[`track_${trackKey}`] && typeof item[`track_${trackKey}`].speeds?.vertical === 'number') {
-                sum += item[`track_${trackKey}`].speeds.vertical;
-                count++;
-            }
-        }
-        
-        return count > 0 ? sum / count : null;
     },
     
     // マーカー位置の更新
     updateMarkerPositions() {
-        if (!this.visualizationData || this.currentTimeIndex < 0 || this.currentTimeIndex >= this.visualizationData.length) {
+        if (!this.visualizationData || this.currentTimeIndex < 0 || 
+            this.currentTimeIndex >= this.visualizationData.length) {
             console.warn('Invalid index or no visualization data for marker update');
             return;
         }
@@ -858,6 +736,129 @@ const Visualization = {
         }
     },
     
+    // 時刻表示の更新
+    updateTimeDisplay(index) {
+        if (!this.visualizationData || index >= this.visualizationData.length) return;
+        
+        const currentData = this.visualizationData[index];
+        if (!currentData || !currentData.timestamp) return;
+        
+        const formattedTime = this.formatTime(currentData.timestamp);
+        
+        // 全ての時刻表示要素を更新
+        const timeElements = [
+            document.getElementById('current-time-display'),
+            document.getElementById('current-time')
+        ];
+        
+        timeElements.forEach(element => {
+            if (element) {
+                element.textContent = formattedTime;
+            }
+        });
+    },
+    
+    // 現在地点の情報表示更新
+    updateCurrentPointDisplay(index) {
+        if (!this.visualizationData || index >= this.visualizationData.length) return;
+        
+        const data = this.visualizationData[index];
+        if (!data) return;
+        
+        // ヘルパー関数: 値を指定された精度で表示
+        const setText = (id, value, unit = '', precision = 1) => {
+            const element = document.getElementById(id);
+            if (element) {
+                if (value != null && !isNaN(value)) {
+                    element.textContent = value.toFixed(precision) + unit;
+                } else {
+                    element.textContent = '-';
+                }
+            }
+        };
+        
+        // トラックAのデータ更新
+        if (data.track_a) {
+            setText('alt-a', data.track_a.ele_ft, ' ft', 0);
+            setText('vspeed-a', data.track_a.speeds?.vertical, ' m/s', 2);
+            setText('vspeed-avg-a', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'a', 10), ' m/s', 2);
+            setText('vaccel-a', data.track_a.accelerations?.vertical, ' m/s²', 2);
+        }
+        
+        // トラックBのデータ更新
+        if (data.track_b) {
+            setText('alt-b', data.track_b.ele_ft, ' ft', 0);
+            setText('vspeed-b', data.track_b.speeds?.vertical, ' m/s', 2);
+            setText('vspeed-avg-b', this.calculateAverageVerticalSpeed(this.visualizationData, index, 'b', 10), ' m/s', 2);
+            setText('vaccel-b', data.track_b.accelerations?.vertical, ' m/s²', 2);
+        }
+        
+        // 共通データの更新
+        setText('distance-3d', data.comparison?.distance_3d, ' m', 1);
+        setText('alt-diff', data.comparison?.height_diff_ft, ' ft', 0);
+    },
+    
+    // テーブル行のハイライト
+    highlightTableRow(index) {
+        const tableBody = document.getElementById('table-body');
+        if (!tableBody) return;
+
+        const highlighted = tableBody.querySelector('.highlighted-row');
+        if (highlighted) {
+            highlighted.classList.remove('highlighted-row');
+        }
+
+        const row = tableBody.querySelector(`tr[data-index="${index}"]`);
+        if (row) {
+            row.classList.add('highlighted-row');
+        }
+    },
+    
+    // テーブルを現在の行までスクロール
+    scrollTableToCurrentRow(index) {
+        const tableBody = document.getElementById('table-body');
+        if (!tableBody) return;
+        
+        const row = tableBody.querySelector(`tr[data-index="${index}"]`);
+        if (row) {
+            // スムーズスクロール
+            row.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest'
+            });
+        }
+    },
+
+    // 過去n秒間の垂直速度平均を計算する関数
+    calculateAverageVerticalSpeed(data, currentIndex, trackKey, seconds) {
+        if (!data || !data[currentIndex]) return null;
+        
+        const currentTime = data[currentIndex].timestamp;
+        if (!currentTime) return null;
+        
+        const targetTime = currentTime - (seconds * 1000); // n秒前の時間
+        
+        let startIndex = currentIndex;
+        // n秒前のデータポイントを探す
+        while (startIndex > 0 && data[startIndex].timestamp > targetTime) {
+            startIndex--;
+        }
+        
+        // 平均を計算するためのデータを収集
+        let sum = 0;
+        let count = 0;
+        
+        for (let i = startIndex; i <= currentIndex; i++) {
+            const item = data[i];
+            if (item && item[`track_${trackKey}`] && typeof item[`track_${trackKey}`].speeds?.vertical === 'number') {
+                sum += item[`track_${trackKey}`].speeds.vertical;
+                count++;
+            }
+        }
+        
+        return count > 0 ? sum / count : null;
+    },
+    
     // アクティブなマーカーをフォローする（自動スクロール）
     followActiveMarkers() {
         let positions = [];
@@ -896,24 +897,6 @@ const Visualization = {
                     duration: 0.5
                 });
             }
-        }
-    },
-    
-    // テーブル行のハイライト
-    highlightTableRow(index) {
-        const tableBody = document.getElementById('table-body');
-        if (!tableBody) return;
-
-        const highlighted = tableBody.querySelector('.highlighted-row');
-        if (highlighted) {
-            highlighted.classList.remove('highlighted-row');
-        }
-
-        const row = tableBody.querySelector(`tr[data-index="${index}"]`);
-        if (row) {
-            row.classList.add('highlighted-row');
-        } else {
-            // console.warn(`Table row not found for index: ${index}`);
         }
     },
     
@@ -1045,6 +1028,7 @@ const Visualization = {
         }
     },
 
+    // アニメーションを停止
     stopAnimation() {
         if (this.animationTimer) {
             console.log('[DEBUG] Stopping animation');
@@ -1053,6 +1037,7 @@ const Visualization = {
         }
     },
 
+    // アニメーションフレーム処理
     animate(timestamp) {
         if (!this.isPlaying) {
             console.log('[DEBUG] Animation stopped');
@@ -1071,8 +1056,9 @@ const Visualization = {
         this.elapsedTime += (deltaTime * this.playbackSpeed);
 
         // 次のインデックスを計算
+        const timeIncrement = (deltaTime * this.playbackSpeed) / this.timeStep;
         const newIndex = Math.min(
-            Math.floor(this.currentTimeIndex + (deltaTime * this.playbackSpeed / this.timeStep)),
+            Math.floor(this.currentTimeIndex + timeIncrement),
             this.visualizationData.length - 1
         );
 
@@ -1085,13 +1071,8 @@ const Visualization = {
             this.currentTimeIndex = newIndex;
         }
 
-        // 表示を更新
+        // 表示を更新（統合メソッドを使用）
         this.updateDisplay(this.currentTimeIndex);
-        this.updateTimelineProgress();
-        this.updateMarkerPositions();
-        
-        // 情報オーバーレイを明示的に更新
-        this.updateCurrentPointDisplay(this.currentTimeIndex);
 
         // アニメーションを継続
         this.animationTimer = requestAnimationFrame(this.animate.bind(this));
@@ -1104,10 +1085,6 @@ const Visualization = {
         this.isPlaying = false;
         this.currentTimeIndex = 0;
         this.updateDisplay(0);
-        this.updateTimelineProgress();
-        this.highlightTableRow(0);
-        
-        // ボタンの状態を更新
         this.updatePlayButtonState();
     },
     
@@ -1139,52 +1116,6 @@ const Visualization = {
         }
     },
     
-    // アニメーションの更新ロジック
-    updateAnimation(timestamp) {
-        if (!this.isPlaying || !this.visualizationData || this.visualizationData.length === 0) return;
-        
-        try {
-            if (!this.lastTimestamp) {
-                this.lastTimestamp = timestamp;
-                requestAnimationFrame(this.animate.bind(this));
-                return;
-            }
-
-            const deltaTime = (timestamp - this.lastTimestamp) * this.playbackSpeed;
-            this.elapsedTime += deltaTime;
-            this.lastTimestamp = timestamp;
-
-            // 次のインデックスを計算
-            const timeStep = 100; // 100msごとに更新
-            const advanceFrames = Math.floor(deltaTime / timeStep);
-            const newIndex = Math.min(
-                this.currentTimeIndex + advanceFrames,
-                this.visualizationData.length - 1
-            );
-            
-            // 最終インデックスを超えた場合
-            if (newIndex >= this.visualizationData.length - 1) {
-                this.currentTimeIndex = this.visualizationData.length - 1;
-                this.updateDisplay(this.currentTimeIndex);
-                this.updateTimelineProgress();
-                this.pause();
-                return;
-            }
-
-            // インデックスが変わった場合のみ更新
-            if (this.currentTimeIndex !== newIndex) {
-                this.currentTimeIndex = newIndex;
-                this.updateDisplay(this.currentTimeIndex);
-                this.updateTimelineProgress();
-            }
-
-            requestAnimationFrame(this.animate.bind(this));
-        } catch (error) {
-            console.error('[DEBUG] Error in updateAnimation:', error);
-            this.pause();
-        }
-    },
-    
     // 指定したインデックスにジャンプ
     jumpToTimeIndex(index) {
         if (!this.visualizationData || index < 0 || index >= this.visualizationData.length) {
@@ -1194,16 +1125,9 @@ const Visualization = {
         
         try {
             console.log(`Jumping to time index: ${index}`);
-            this.currentTimeIndex = index;
             
-            // 表示を更新
+            // 統合された表示更新メソッドを使用
             this.updateDisplay(index);
-            
-            // 明示的にマーカー位置を更新
-            this.updateMarkerPositions();
-            
-            // 時刻バーの位置を更新
-            this.updateTimelineProgress();
             
             // 経過時間を更新
             if (this.visualizationData && this.visualizationData.length > 0) {
@@ -1250,247 +1174,21 @@ const Visualization = {
             indicator.style.display = 'none';
         }
     },
-
-    // その他のイベントリスナーをセットアップするメソッド
-    setupOtherListeners() {
-        console.log('Setting up other event listeners');
-        
-        try {
-            // マップのリサイズイベント
-            window.addEventListener('resize', () => this.onWindowResize());
-            
-            // すべてのオーバーレイを設定
-            this.setupAllOverlays();
-            
-            // リサイズハンドラーがあれば設定
-            this.setupResizeHandler();
-            
-            // テーブル関連のイベントリスナーを別途設定
-            this.setupTableEventListeners();
-            
-            console.log('Other event listeners initialized successfully');
-        } catch (error) {
-            console.error('Error setting up other event listeners:', error);
-        }
-    },
-
-    // テーブル関連のイベントリスナーを設定
-    setupTableEventListeners() {
-        console.log('[DEBUG] Setting up table event listeners');
-        
-        try {
-            const tableBody = document.getElementById('table-body');
-            if (!tableBody) {
-                console.warn('[DEBUG] Table body not found');
-                return;
-            }
-            
-            console.log('[DEBUG] Found table body:', tableBody);
-            
-            // 既存のイベントリスナーを削除して新しいものを追加
-            const rows = tableBody.getElementsByTagName('tr');
-            console.log('[DEBUG] Found table rows:', rows.length);
-            
-            Array.from(rows).forEach((row, rowIndex) => {
-                const newRow = row.cloneNode(true);
-                row.parentNode.replaceChild(newRow, row);
-                
-                // data-index属性の確認と設定
-                let index = parseInt(newRow.getAttribute('data-index'));
-                if (isNaN(index)) {
-                    // data-index属性が設定されていない場合は行番号を使用
-                    index = rowIndex;
-                    newRow.setAttribute('data-index', index);
-                }
-                
-                console.log('[DEBUG] Setting up click listener for row:', {
-                    index: index,
-                    hasDataIndex: newRow.hasAttribute('data-index'),
-                    dataIndexValue: newRow.getAttribute('data-index')
-                });
-                
-                // 新しいイベントリスナーを追加
-                newRow.addEventListener('click', () => {
-                    console.log('[DEBUG] Table row clicked:', {
-                        index: index,
-                        isPlaying: this.isPlaying
-                    });
-                    
-                    // 再生を一時停止
-                    if (this.isPlaying) {
-                        this.pause();
-                    }
-                    
-                    // 指定位置にジャンプ
-                    this.jumpToTimeIndex(index);
-                });
-            });
-            
-            console.log('[DEBUG] Table event listeners setup complete');
-        } catch (error) {
-            console.error('[DEBUG] Error setting up table event listeners:', error);
-        }
-    },
-
-    // 時間範囲コントロールのセットアップを更新
-    setupTimeRangeControl() {
-        console.log('Setting up simple time bar');
-        
-        // シンプルな時刻バーの要素を取得
-        const timeSlider = document.querySelector('.simple-time-slider');
-        const timelineProgress = document.querySelector('.timeline-progress');
-        const timelineThumb = document.querySelector('.timeline-thumb');
-        const currentTimeDisplay = document.getElementById('current-time-display');
-        const startTimeDisplay = document.getElementById('start-time');
-        const endTimeDisplay = document.getElementById('end-time');
-        
-        if (!timeSlider || !timelineProgress || !timelineThumb) {
-            console.error('Simple time bar elements not found');
-            return;
-        }
-        
-        // 初期時間表示の設定
-        if (this.visualizationData && this.visualizationData.length > 0) {
-            const firstPoint = this.visualizationData[0];
-            const lastPoint = this.visualizationData[this.visualizationData.length - 1];
-            
-            if (startTimeDisplay && firstPoint && firstPoint.time) {
-                startTimeDisplay.textContent = firstPoint.time;
-            }
-            
-            if (endTimeDisplay && lastPoint && lastPoint.time) {
-                endTimeDisplay.textContent = lastPoint.time;
-            }
-            
-            if (currentTimeDisplay && firstPoint && firstPoint.time) {
-                currentTimeDisplay.textContent = firstPoint.time;
-            }
-        }
-        
-        // クリックイベントでの時間移動
-        timeSlider.addEventListener('click', (e) => {
-            const rect = timeSlider.getBoundingClientRect();
-            const percentage = (e.clientX - rect.left) / rect.width;
-            this.updateTimelinePosition(percentage);
-        });
-        
-        // ドラッグ操作の設定
-        let isDragging = false;
-        
-        timelineThumb.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            isDragging = true;
-            timeSlider.classList.add('dragging');
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
-        
-        const onMouseMove = (e) => {
-            if (!isDragging) return;
-            
-            const rect = timeSlider.getBoundingClientRect();
-            const percentage = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            this.updateTimelinePosition(percentage);
-        };
-        
-        const onMouseUp = () => {
-            isDragging = false;
-            timeSlider.classList.remove('dragging');
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-        };
-        
-        // タッチデバイス対応
-        timelineThumb.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            isDragging = true;
-            timeSlider.classList.add('dragging');
-            document.addEventListener('touchmove', onTouchMove);
-            document.addEventListener('touchend', onTouchEnd);
-        });
-        
-        const onTouchMove = (e) => {
-            if (!isDragging || !e.touches[0]) return;
-            
-            const rect = timeSlider.getBoundingClientRect();
-            const percentage = Math.max(0, Math.min(1, (e.touches[0].clientX - rect.left) / rect.width));
-            this.updateTimelinePosition(percentage);
-        };
-        
-        const onTouchEnd = () => {
-            isDragging = false;
-            timeSlider.classList.remove('dragging');
-            document.removeEventListener('touchmove', onTouchMove);
-            document.removeEventListener('touchend', onTouchEnd);
-        };
-        
-        console.log('Simple time bar setup complete');
-    },
-
-    // タイムラインの位置を更新（パーセンテージで指定）
-    updateTimelinePosition(percentage) {
+    
+    // タイムラインの進行状況を更新
+    updateTimelineProgress() {
         if (!this.visualizationData || this.visualizationData.length === 0) return;
         
         try {
-            const index = Math.floor(percentage * (this.visualizationData.length - 1));
-            
-            // インデックスの範囲チェック
+            const index = this.currentTimeIndex;
             if (index < 0 || index >= this.visualizationData.length) {
-                console.warn(`[DEBUG] Invalid index calculated in updateTimelinePosition: ${index}`);
-                return;
-            }
-            
-            // 現在のインデックスを更新（jumpToTimeIndexを直接呼ばずにその中身を実装）
-            console.log(`[DEBUG] Updating timeline position to index: ${index}`);
-            this.currentTimeIndex = index;
-            
-            // 表示を更新
-            this.updateDisplay(index);
-            
-            // マーカー位置を更新
-            this.updateMarkerPositions();
-            
-            // タイムラインの進行状況を更新
-            this.updateTimelineProgress();
-            
-            // UIの更新
-            const timelineProgress = document.querySelector('.timeline-progress');
-            const timelineThumb = document.querySelector('.timeline-thumb');
-            
-            if (timelineProgress && timelineThumb) {
-                const percentStr = `${percentage * 100}%`;
-                timelineProgress.style.width = percentStr;
-                timelineThumb.style.left = percentStr;
-            }
-            
-            // 現在時刻表示の更新
-            const currentTimeDisplay = document.getElementById('current-time-display');
-            if (currentTimeDisplay && this.visualizationData[index]) {
-                // timestampがある場合はそれを使用、なければtimeプロパティを使用
-                if (this.visualizationData[index].timestamp) {
-                    currentTimeDisplay.textContent = this.formatTime(this.visualizationData[index].timestamp);
-                } else if (this.visualizationData[index].time) {
-                    currentTimeDisplay.textContent = this.visualizationData[index].time;
-                }
-            }
-        } catch (error) {
-            console.error('[DEBUG] Error in updateTimelinePosition:', error);
-        }
-    },
-
-    // 現在位置インジケータ更新メソッド
-    updateCurrentTimeIndicator(index) {
-        if (!this.visualizationData || this.visualizationData.length === 0) return;
-        
-        try {
-            if (index < 0 || index >= this.visualizationData.length) {
-                console.warn(`[DEBUG] Invalid index in updateCurrentTimeIndicator: ${index}`);
+                console.warn(`[DEBUG] Invalid index in updateTimelineProgress: ${index}`);
                 return;
             }
             
             const percentage = index / (this.visualizationData.length - 1);
             
-            // タイムラインの位置を更新
+            // タイムラインの更新
             const timelineProgress = document.querySelector('.timeline-progress');
             const timelineThumb = document.querySelector('.timeline-thumb');
             
@@ -1500,160 +1198,178 @@ const Visualization = {
                 timelineThumb.style.left = percentStr;
             }
             
-            // 現在時刻表示を更新
-            const timeData = this.visualizationData[index];
-            if (timeData) {
-                let timeStr = '';
-                
-                // timestampを優先して使用
-                if (timeData.timestamp) {
-                    timeStr = this.formatTime(timeData.timestamp);
-                } else if (timeData.time) {
-                    timeStr = timeData.time;
-                    // 時間のみ表示にフォーマット調整（必要に応じて）
-                    if (timeStr.includes(' ')) {
-                        timeStr = timeStr.split(' ')[1]; // HH:MM:SS部分のみ
-                    }
-                }
-                
-                // 現在時刻表示エレメントを更新
-                const currentTimeDisplay = document.getElementById('current-time-display');
-                if (currentTimeDisplay) {
-                    currentTimeDisplay.textContent = timeStr;
-                }
-                
-                // info-overlay内の時刻表示も更新
-                const currentTimeInfo = document.getElementById('current-time');
-                if (currentTimeInfo) {
-                    currentTimeInfo.textContent = timeStr;
-                }
+            // 補足時間バーの更新
+            const timeThumb = document.querySelector('.time-thumb');
+            const timeProgress = document.querySelector('.time-progress');
+            
+            if (timeThumb && timeProgress) {
+                timeThumb.style.left = `${percentage * 100}%`;
+                timeProgress.style.width = `${percentage * 100}%`;
             }
         } catch (error) {
-            console.error('[DEBUG] Error in updateCurrentTimeIndicator:', error);
+            console.error('[DEBUG] Error in updateTimelineProgress:', error);
         }
     },
 
-    // 情報オーバーレイのセットアップを追加
-    setupInfoOverlay() {
-        console.log('Setting up info overlay');
+    // タイムラインのイベントリスナーを初期化
+    initTimelineListeners() {
+        console.log('[DEBUG] タイムラインリスナーを初期化中...');
         
         try {
-            const infoOverlay = document.getElementById('info-overlay');
-            if (!infoOverlay) {
-                console.warn('Info overlay element not found');
-                return;
-            }
+            // タイムバーのドラッグ機能を設定
+            const timeSlider = document.querySelector('.time-slider');
+            const timeThumb = document.querySelector('.time-thumb');
+            const timeProgress = document.querySelector('.time-progress');
             
-            // オーバーレイ基本クラスを追加
-            infoOverlay.classList.add('map-overlay-base');
-        } catch (error) {
-            console.error('Error setting up info overlay:', error);
-        }
-    },
-
-    // すべてのオーバーレイを設定
-    setupAllOverlays() {
-        console.log('Setting up all overlays');
-        
-        try {
-            // 全てのマップオーバーレイを取得
-            const overlays = document.querySelectorAll('.map-overlay-base');
-            
-            // グローバルイベントディスパッチャー
-            const mapContainer = document.getElementById('map-container');
-            if (mapContainer) {
-                // contextmenu、dblclickイベントのみを防止、マウスドラッグとホイールズームは許可
-                ['contextmenu', 'dblclick'].forEach(eventType => {
-                    mapContainer.addEventListener(eventType, (e) => {
-                        // オーバーレイ内でのイベントは処理しない（伝播させる）
-                        if (e.target.closest('.map-overlay-base') || 
-                            e.target.closest('button') || 
-                            e.target.closest('input')) {
-                            return;
-                        }
-                        
-                        // マップ上での右クリックとダブルクリックは防止
-                        if (eventType === 'contextmenu' || eventType === 'dblclick') {
-                            e.preventDefault();
-                        }
-                    }, false);
-                });
-                
-                // マウスドラッグをサポートするためのイベント処理
+            if (timeSlider && timeThumb && timeProgress) {
+                console.log('[DEBUG] Time slider elements found');
                 let isDragging = false;
                 
-                mapContainer.addEventListener('mousedown', (e) => {
-                    // オーバーレイ内でのクリックは無視
-                    if (e.target.closest('.map-overlay-base') || 
-                        e.target.closest('button') || 
-                        e.target.closest('input')) {
-                        return;
+                // クリックでの時間移動
+                timeSlider.addEventListener('click', (e) => {
+                    if (e.target === timeThumb) return; // サムネイルのクリックは無視
+                    
+                    // 一時的に再生を停止
+                    const wasPlaying = this.isPlaying;
+                    if (wasPlaying) {
+                        this.pause();
                     }
+                    
+                    const rect = timeSlider.getBoundingClientRect();
+                    const percentage = (e.clientX - rect.left) / rect.width;
+                    
+                    if (this.visualizationData && this.visualizationData.length > 0) {
+                        const targetIndex = Math.floor(percentage * (this.visualizationData.length - 1));
+                        console.log(`[DEBUG] Clicked time slider at ${percentage}, jumping to index ${targetIndex}`);
+                        this.jumpToTimeIndex(targetIndex);
+                    }
+                    
+                    // 再生状態を復元
+                    if (wasPlaying) {
+                        setTimeout(() => this.play(), 100);
+                    }
+                });
+                
+                // ドラッグ開始
+                timeThumb.addEventListener('mousedown', (e) => {
                     isDragging = true;
-                }, false);
-                
-                // マウスムーブはマップの動作を優先
-                document.addEventListener('mousemove', (e) => {
-                    if (isDragging) {
-                        // ドラッグ中は何もしない（マップのドラッグを許可）
+                    timeSlider.classList.add('dragging');
+                    document.body.style.cursor = 'grabbing';
+                    
+                    // 一時的に再生を停止
+                    this.wasDraggingAndPlaying = this.isPlaying;
+                    if (this.isPlaying) {
+                        this.pause();
                     }
-                }, false);
+                    
+                    e.preventDefault();
+                    console.log('[DEBUG] Time thumb drag started');
+                });
                 
+                // ドラッグ中
+                document.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    
+                    try {
+                        const rect = timeSlider.getBoundingClientRect();
+                        const percentage = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                        
+                        if (this.visualizationData && this.visualizationData.length > 0) {
+                            const targetIndex = Math.floor(percentage * (this.visualizationData.length - 1));
+                            if (targetIndex >= 0 && targetIndex < this.visualizationData.length) {
+                                // 統合された表示更新メソッドを使用
+                                this.updateDisplay(targetIndex);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('[DEBUG] Error during time thumb drag:', error);
+                    }
+                });
+                
+                // ドラッグ終了
                 document.addEventListener('mouseup', () => {
-                    isDragging = false;
-                }, false);
+                    if (isDragging) {
+                        isDragging = false;
+                        timeSlider.classList.remove('dragging');
+                        document.body.style.cursor = '';
+                        console.log('[DEBUG] Time thumb drag ended');
+                        
+                        // ドラッグ前に再生中だった場合は再生を再開
+                        if (this.wasDraggingAndPlaying) {
+                            setTimeout(() => {
+                                this.play();
+                                this.wasDraggingAndPlaying = false;
+                            }, 100);
+                        }
+                    }
+                });
+                
+                // タッチデバイス対応
+                timeThumb.addEventListener('touchstart', (e) => {
+                    isDragging = true;
+                    timeSlider.classList.add('dragging');
+                    
+                    // 一時的に再生を停止
+                    this.wasDraggingAndPlaying = this.isPlaying;
+                    if (this.isPlaying) {
+                        this.pause();
+                    }
+                    
+                    e.preventDefault();
+                    console.log('[DEBUG] Time thumb touch started');
+                });
+                
+                document.addEventListener('touchmove', (e) => {
+                    if (!isDragging) return;
+                    
+                    try {
+                        const touch = e.touches[0];
+                        const rect = timeSlider.getBoundingClientRect();
+                        const percentage = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                        
+                        if (this.visualizationData && this.visualizationData.length > 0) {
+                            const targetIndex = Math.floor(percentage * (this.visualizationData.length - 1));
+                            if (targetIndex >= 0 && targetIndex < this.visualizationData.length) {
+                                // 統合された表示更新メソッドを使用
+                                this.updateDisplay(targetIndex);
+                            }
+                        }
+                        e.preventDefault();
+                    } catch (error) {
+                        console.error('[DEBUG] Error during time thumb touch:', error);
+                    }
+                });
+                
+                document.addEventListener('touchend', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        timeSlider.classList.remove('dragging');
+                        console.log('[DEBUG] Time thumb touch ended');
+                        
+                        // ドラッグ前に再生中だった場合は再生を再開
+                        if (this.wasDraggingAndPlaying) {
+                            setTimeout(() => {
+                                this.play();
+                                this.wasDraggingAndPlaying = false;
+                            }, 100);
+                        }
+                    }
+                });
+            } else {
+                console.warn('[DEBUG] Time slider elements not found:', {
+                    timeSlider: !!timeSlider,
+                    timeThumb: !!timeThumb,
+                    timeProgress: !!timeProgress
+                });
             }
             
-            // 個々のオーバーレイに対して処理
-            overlays.forEach(overlay => {
-                // ホイールイベントに対しては特別な処理をしない（マップへの伝播を許可）
-                this.preventNonWheelEventPropagation(overlay);
-            });
-            
-            console.log('All overlays setup complete');
+            console.log('[DEBUG] タイムラインリスナーの初期化が完了しました');
         } catch (error) {
-            console.error('Error setting up overlays:', error);
+            console.error('[DEBUG] タイムラインリスナーの初期化中にエラーが発生しました:', error);
         }
     },
-
-    // ホイールイベント以外の伝播を防止する関数（ホイールズームを保持する）
-    preventNonWheelEventPropagation(element) {
-        if (!element) return;
-        
-        console.log('Setting up event prevention (except wheel) for element:', element.className || element.id);
-        
-        const handleEvent = function(e) {
-            // クリックイベントやボタン操作は許可
-            if (e.type === 'click' || 
-                (e.type === 'mousedown' && 
-                    (e.target.tagName === 'BUTTON' || 
-                     e.target.classList.contains('play-icon') || 
-                     e.target.classList.contains('reset-icon'))) || 
-                (e.type === 'input' && e.target.tagName === 'INPUT')) {
-                // ボタン操作やインプットは通常通り処理
-                return;
-            }
-            
-            // 右クリック、ダブルクリックのデフォルト動作は防止
-            if (e.type === 'contextmenu' || e.type === 'dblclick') {
-                e.stopPropagation();
-            }
-        };
-        
-        // マップドラッグとホイールズームを妨げないイベントリスナーを追加
-        const events = ['contextmenu', 'dblclick'];
-        
-        events.forEach(eventType => {
-            element.addEventListener(eventType, handleEvent, true);
-        });
-    },
-
-    // マップとの相互作用を防止するヘルパー関数
-    preventMapInteraction(e) {
-        e.stopPropagation();
-    },
-
-    // リサイズハンドラの設定 - シンプルな実装
+    
+    // リサイズハンドラの設定
     setupResizeHandler() {
         console.log('Setting up resize handler');
         const resizeHandle = document.getElementById('resize-handle');
@@ -1744,744 +1460,8 @@ const Visualization = {
         updateMapSize();
         console.log('Resize handler setup completed');
     },
-
-    // シンプルなタイムバーのリスナー初期化
-    initSimpleTimeBarListeners() {
-        console.log('[DEBUG] Initializing simple time bar listeners');
-        
-        const timeBar = document.querySelector('.simple-time-bar-container');
-        const timeSlider = timeBar.querySelector('.time-slider');
-        const timeProgress = timeBar.querySelector('.time-progress');
-        const timeThumb = timeBar.querySelector('.time-thumb');
-        
-        if (!timeBar || !timeSlider || !timeProgress || !timeThumb) {
-            console.error('[DEBUG] Time bar elements not found:', {
-                timeBar: !!timeBar,
-                timeSlider: !!timeSlider,
-                timeProgress: !!timeProgress,
-                timeThumb: !!timeThumb
-            });
-            return;
-        }
-        
-        console.log('[DEBUG] Found time bar elements');
-        
-        let isDragging = false;
-        
-        const handleTimeMouseDown = (e) => {
-            isDragging = true;
-            timeBar.style.cursor = 'grabbing';
-            document.addEventListener('mousemove', handleTimeMouseMove);
-            document.addEventListener('mouseup', handleTimeMouseUp);
-            e.preventDefault();
-            
-            // 初回クリック時の位置を更新
-            const rect = timeSlider.getBoundingClientRect();
-            const position = (e.clientX - rect.left) / rect.width;
-            this.updateTimePosition(position);
-        };
-        
-        const handleTimeMouseMove = (e) => {
-            if (!isDragging) return;
-            const rect = timeSlider.getBoundingClientRect();
-            const position = (e.clientX - rect.left) / rect.width;
-            this.updateTimePosition(position);
-        };
-        
-        const handleTimeMouseUp = () => {
-            isDragging = false;
-            timeBar.style.cursor = '';
-            document.removeEventListener('mousemove', handleTimeMouseMove);
-            document.removeEventListener('mouseup', handleTimeMouseUp);
-        };
-        
-        timeSlider.addEventListener('mousedown', handleTimeMouseDown);
-        
-        // タッチイベントのサポート
-        timeSlider.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            const touch = e.touches[0];
-            const rect = timeSlider.getBoundingClientRect();
-            const position = (touch.clientX - rect.left) / rect.width;
-            this.updateTimePosition(position);
-            e.preventDefault();
-        });
-        
-        timeSlider.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            const touch = e.touches[0];
-            const rect = timeSlider.getBoundingClientRect();
-            const position = (touch.clientX - rect.left) / rect.width;
-            this.updateTimePosition(position);
-            e.preventDefault();
-        });
-        
-        timeSlider.addEventListener('touchend', () => {
-            isDragging = false;
-        });
-        
-        console.log('[DEBUG] Time bar listeners initialized');
-    },
     
-    updateTimePosition(position) {
-        if (!this.visualizationData || this.visualizationData.length === 0) return;
-
-        try {
-            // 位置を0-1の範囲に制限
-            position = Math.max(0, Math.min(1, position));
-            
-            // インデックスの計算
-            const index = Math.round(position * (this.visualizationData.length - 1));
-            if (index < 0 || index >= this.visualizationData.length) {
-                console.warn(`[DEBUG] Invalid calculated index: ${index}`);
-                return;
-            }
-            
-            console.log(`[DEBUG] Updating time position to index: ${index}`);
-            
-            // 現在のインデックスを更新
-            this.currentTimeIndex = index;
-            
-            // 表示を更新
-            this.updateDisplay(index);
-            
-            // マーカー位置を更新
-            this.updateMarkerPositions();
-            
-            // タイムラインの進行状況を更新
-            this.updateTimelineProgress();
-            
-            // プログレスバーとサムの位置を更新 (念のため直接更新)
-            const timeThumb = document.querySelector('.time-thumb');
-            const timeProgress = document.querySelector('.time-progress');
-            
-            if (timeThumb && timeProgress) {
-                timeThumb.style.left = `${position * 100}%`;
-                timeProgress.style.width = `${position * 100}%`;
-            }
-            
-            // UI更新
-            this.updateTimeDisplay(index);
-        } catch (error) {
-            console.error('[DEBUG] Error in updateTimePosition:', error);
-        }
-    },
-
-    // 表示を特定の時間に更新
-    updateDisplayToTime(targetTime) {
-        if (!this.visualizationData || this.visualizationData.length === 0) return;
-        
-        // 指定された時間に最も近いデータポイントを見つける
-        let closestIndex = 0;
-        let minTimeDiff = Number.MAX_VALUE;
-        
-        this.visualizationData.forEach((point, index) => {
-            const timeDiff = Math.abs(point.timestamp - targetTime);
-            if (timeDiff < minTimeDiff) {
-                minTimeDiff = timeDiff;
-                closestIndex = index;
-            }
-        });
-        
-        // 見つかったインデックスに再生位置を設定
-        this.currentTimeIndex = closestIndex;
-        this.updateDisplay();
-        
-        // タイムラインの進行状況を更新
-        this.updateTimelineProgress();
-    },
-
-    // 再生状態の更新時にシンプルタイムバーも更新
-    updateTimelineProgress() {
-        if (!this.visualizationData || this.visualizationData.length === 0) return;
-        
-        try {
-            const index = this.currentTimeIndex;
-            if (index < 0 || index >= this.visualizationData.length) {
-                console.warn(`[DEBUG] Invalid index in updateTimelineProgress: ${index}`);
-                return;
-            }
-            
-            const percentage = index / (this.visualizationData.length - 1);
-            
-            // 補足時間バーの更新
-            const timeThumb = document.querySelector('.time-thumb');
-            const timeProgress = document.querySelector('.time-progress');
-            
-            if (timeThumb && timeProgress) {
-                timeThumb.style.left = `${percentage * 100}%`;
-                timeProgress.style.width = `${percentage * 100}%`;
-            }
-            
-            // 時刻表示の更新
-            const currentData = this.visualizationData[index];
-            if (currentData && currentData.timestamp) {
-                const formattedTime = this.formatTime(currentData.timestamp);
-                
-                // 必要な要素を取得し、存在する場合のみ更新
-                const currentTimeDisplay = document.getElementById('current-time-display');
-                const currentTime = document.getElementById('current-time');
-                
-                if (currentTimeDisplay) {
-                    currentTimeDisplay.textContent = formattedTime;
-                }
-                
-                if (currentTime) {
-                    currentTime.textContent = formattedTime;
-                }
-            }
-        } catch (error) {
-            console.error('[DEBUG] Error in updateTimelineProgress:', error);
-        }
-    },
-
-    // 表示を更新する際に現在時刻のJST表示も更新
-    updateDisplay() {
-        // ... existing code ...
-        
-        // 現在の時刻表示を更新（JSTに変換）
-        const currentPoint = this.visualizationData[this.currentTimeIndex];
-        if (currentPoint) {
-            const currentTimeEl = document.getElementById('current-time');
-            if (currentTimeEl) {
-                const date = new Date(currentPoint.timestamp);
-                // UTCからJSTに変換（+9時間）
-                date.setTime(date.getTime() + (9 * 60 * 60 * 1000));
-                
-                const hours = date.getHours().toString().padStart(2, '0');
-                const minutes = date.getMinutes().toString().padStart(2, '0');
-                const seconds = date.getSeconds().toString().padStart(2, '0');
-                currentTimeEl.textContent = `${hours}:${minutes}:${seconds}`;
-            }
-        }
-        
-        // ... existing code ...
-    },
-
-    // タイムラインのイベントリスナーを初期化
-    initTimelineListeners() {
-        console.log('[DEBUG] タイムラインリスナーを初期化中...');
-        
-        try {
-            // タイムバーのドラッグ機能を設定
-            const timeSlider = document.querySelector('.time-slider');
-            const timeThumb = document.querySelector('.time-thumb');
-            const timeProgress = document.querySelector('.time-progress');
-            
-            if (timeSlider && timeThumb && timeProgress) {
-                console.log('[DEBUG] Time slider elements found');
-                let isDragging = false;
-                
-                // クリックでの時間移動
-                timeSlider.addEventListener('click', (e) => {
-                    if (e.target === timeThumb) return; // サムネイルのクリックは無視
-                    
-                    // 一時的に再生を停止
-                    const wasPlaying = this.isPlaying;
-                    if (wasPlaying) {
-                        this.pause();
-                    }
-                    
-                    const rect = timeSlider.getBoundingClientRect();
-                    const percentage = (e.clientX - rect.left) / rect.width;
-                    
-                    // プログレスバーとサムの位置を更新
-                    timeProgress.style.width = `${percentage * 100}%`;
-                    timeThumb.style.left = `${percentage * 100}%`;
-                    
-                    if (this.visualizationData && this.visualizationData.length > 0) {
-                        const targetIndex = Math.floor(percentage * (this.visualizationData.length - 1));
-                        console.log(`[DEBUG] Clicked time slider at ${percentage}, jumping to index ${targetIndex}`);
-                        this.jumpToTimeIndex(targetIndex);
-                        
-                        // マーカー位置を明示的に更新
-                        this.updateMarkerPositions();
-                    }
-                    
-                    // 再生状態を復元
-                    if (wasPlaying) {
-                        setTimeout(() => this.play(), 100);
-                    }
-                });
-                
-                // ドラッグ開始
-                timeThumb.addEventListener('mousedown', (e) => {
-                    isDragging = true;
-                    timeSlider.classList.add('dragging');
-                    document.body.style.cursor = 'grabbing';
-                    
-                    // 一時的に再生を停止
-                    this.wasDraggingAndPlaying = this.isPlaying;
-                    if (this.isPlaying) {
-                        this.pause();
-                    }
-                    
-                    e.preventDefault();
-                    console.log('[DEBUG] Time thumb drag started');
-                });
-                
-                // ドラッグ中
-                document.addEventListener('mousemove', (e) => {
-                    if (!isDragging) return;
-                    
-                    try {
-                        const rect = timeSlider.getBoundingClientRect();
-                        const percentage = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                        
-                        // プログレスバーとサムの位置を直接更新（エラーを回避）
-                        if (timeProgress && timeThumb) {
-                            timeProgress.style.width = `${percentage * 100}%`;
-                            timeThumb.style.left = `${percentage * 100}%`;
-                        }
-                        
-                        if (this.visualizationData && this.visualizationData.length > 0) {
-                            const targetIndex = Math.floor(percentage * (this.visualizationData.length - 1));
-                            if (targetIndex >= 0 && targetIndex < this.visualizationData.length) {
-                                // currentTimeIndexを直接更新
-                                this.currentTimeIndex = targetIndex;
-                                
-                                // 表示を更新（要素の存在確認を含む関数）
-                                this.updateDisplay(targetIndex);
-                                
-                                // マーカー位置を明示的に更新
-                                this.updateMarkerPositions();
-                                
-                                // タイムラインの状態を更新（ダブルセーフティのため）
-                                this.updateTimelineProgress();
-                            }
-                        }
-                    } catch (error) {
-                        console.error('[DEBUG] Error during time thumb drag:', error);
-                    }
-                });
-                
-                // ドラッグ終了
-                document.addEventListener('mouseup', () => {
-                    if (isDragging) {
-                        isDragging = false;
-                        timeSlider.classList.remove('dragging');
-                        document.body.style.cursor = '';
-                        console.log('[DEBUG] Time thumb drag ended');
-                        
-                        // ドラッグ前に再生中だった場合は再生を再開
-                        if (this.wasDraggingAndPlaying) {
-                            setTimeout(() => {
-                                this.play();
-                                this.wasDraggingAndPlaying = false;
-                            }, 100);
-                        }
-                    }
-                });
-                
-                // タッチデバイス対応
-                timeThumb.addEventListener('touchstart', (e) => {
-                    isDragging = true;
-                    timeSlider.classList.add('dragging');
-                    
-                    // 一時的に再生を停止
-                    this.wasDraggingAndPlaying = this.isPlaying;
-                    if (this.isPlaying) {
-                        this.pause();
-                    }
-                    
-                    e.preventDefault();
-                    console.log('[DEBUG] Time thumb touch started');
-                });
-                
-                document.addEventListener('touchmove', (e) => {
-                    if (!isDragging) return;
-                    
-                    try {
-                        const touch = e.touches[0];
-                        const rect = timeSlider.getBoundingClientRect();
-                        const percentage = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-                        
-                        // プログレスバーとサムの位置を直接更新
-                        if (timeProgress && timeThumb) {
-                            timeProgress.style.width = `${percentage * 100}%`;
-                            timeThumb.style.left = `${percentage * 100}%`;
-                        }
-                        
-                        if (this.visualizationData && this.visualizationData.length > 0) {
-                            const targetIndex = Math.floor(percentage * (this.visualizationData.length - 1));
-                            if (targetIndex >= 0 && targetIndex < this.visualizationData.length) {
-                                // currentTimeIndexを直接更新
-                                this.currentTimeIndex = targetIndex;
-                                
-                                // 表示を更新
-                                this.updateDisplay(targetIndex);
-                                
-                                // マーカー位置を明示的に更新
-                                this.updateMarkerPositions();
-                                
-                                // タイムラインの状態を更新
-                                this.updateTimelineProgress();
-                            }
-                        }
-                        e.preventDefault();
-                    } catch (error) {
-                        console.error('[DEBUG] Error during time thumb touch:', error);
-                    }
-                });
-                
-                document.addEventListener('touchend', () => {
-                    if (isDragging) {
-                        isDragging = false;
-                        timeSlider.classList.remove('dragging');
-                        console.log('[DEBUG] Time thumb touch ended');
-                        
-                        // ドラッグ前に再生中だった場合は再生を再開
-                        if (this.wasDraggingAndPlaying) {
-                            setTimeout(() => {
-                                this.play();
-                                this.wasDraggingAndPlaying = false;
-                            }, 100);
-                        }
-                    }
-                });
-            } else {
-                console.warn('[DEBUG] Time slider elements not found:', {
-                    timeSlider: !!timeSlider,
-                    timeThumb: !!timeThumb,
-                    timeProgress: !!timeProgress
-                });
-            }
-            
-            console.log('[DEBUG] タイムラインリスナーの初期化が完了しました');
-        } catch (error) {
-            console.error('[DEBUG] タイムラインリスナーの初期化中にエラーが発生しました:', error);
-        }
-    },
-    
-    // テーブル行のクリックイベントを設定
-    setupTableEventListeners() {
-        console.log('[DEBUG] Setting up table event listeners');
-        
-        try {
-            const tableBody = document.getElementById('table-body');
-            if (!tableBody) {
-                console.warn('[DEBUG] Table body not found');
-                return;
-            }
-            
-            console.log('[DEBUG] Found table body:', tableBody);
-            
-            // 既存のイベントリスナーを削除して新しいものを追加
-            const rows = tableBody.getElementsByTagName('tr');
-            console.log('[DEBUG] Found table rows:', rows.length);
-            
-            Array.from(rows).forEach((row, rowIndex) => {
-                const newRow = row.cloneNode(true);
-                row.parentNode.replaceChild(newRow, row);
-                
-                // data-index属性の確認と設定
-                let index = parseInt(newRow.getAttribute('data-index'));
-                if (isNaN(index)) {
-                    // data-index属性が設定されていない場合は行番号を使用
-                    index = rowIndex;
-                    newRow.setAttribute('data-index', index);
-                }
-                
-                console.log('[DEBUG] Setting up click listener for row:', {
-                    index: index,
-                    hasDataIndex: newRow.hasAttribute('data-index'),
-                    dataIndexValue: newRow.getAttribute('data-index')
-                });
-                
-                // 新しいイベントリスナーを追加
-                newRow.addEventListener('click', () => {
-                    console.log('[DEBUG] Table row clicked:', {
-                        index: index,
-                        isPlaying: this.isPlaying
-                    });
-                    
-                    // 再生を一時停止
-                    if (this.isPlaying) {
-                        this.pause();
-                    }
-                    
-                    // 指定位置にジャンプ
-                    this.jumpToTimeIndex(index);
-                });
-            });
-            
-            console.log('[DEBUG] Table event listeners setup complete');
-        } catch (error) {
-            console.error('Error setting up table event listeners:', error);
-        }
-    },
-
-    // 情報オーバーレイの更新が必要かどうかを判定
-    shouldUpdateInfoOverlay(currentData) {
-        if (!this.lastInfoData) {
-            this.lastInfoData = currentData;
-            return true;
-        }
-        
-        // 重要な値が変更された場合のみ更新
-        const shouldUpdate = 
-            this.lastInfoData.track_a?.ele_ft !== currentData.track_a?.ele_ft ||
-            this.lastInfoData.track_b?.ele_ft !== currentData.track_b?.ele_ft ||
-            this.lastInfoData.track_a?.speeds?.vertical !== currentData.track_a?.speeds?.vertical ||
-            this.lastInfoData.track_b?.speeds?.vertical !== currentData.track_b?.speeds?.vertical;
-        
-        if (shouldUpdate) {
-            this.lastInfoData = currentData;
-        }
-        
-        return shouldUpdate;
-    },
-
-    // タイムラインの更新が必要かどうかを判定
-    shouldUpdateTimeline() {
-        const percentage = this.currentTimeIndex / (this.visualizationData.length - 1);
-        const currentPercentage = Math.floor(percentage * 100);
-        
-        if (this.lastTimelinePercentage !== currentPercentage) {
-            this.lastTimelinePercentage = currentPercentage;
-            return true;
-        }
-        return false;
-    },
-
-    // テーブルハイライトの更新が必要かどうかを判定
-    shouldUpdateTableHighlight() {
-        if (this.lastHighlightedIndex !== this.currentTimeIndex) {
-            this.lastHighlightedIndex = this.currentTimeIndex;
-            return true;
-        }
-        return false;
-    },
-
-    // 現在の時刻インジケーターを更新
-    updateCurrentTimeIndicator(timeIndex) {
-        const timelineProgress = document.querySelector('.timeline-progress');
-        const timelineThumb = document.querySelector('.timeline-thumb');
-        
-        if (!timelineProgress || !timelineThumb) return;
-        
-        const percentage = timeIndex / (this.visualizationData.length - 1);
-        const percentStr = `${percentage * 100}%`;
-        
-        timelineProgress.style.width = percentStr;
-        timelineThumb.style.left = percentStr;
-    },
-
-    // 補足時間バーの設定
-    setupSupplementaryTimeBar() {
-        const timeSlider = document.querySelector('.time-slider');
-        const timeThumb = document.querySelector('.time-thumb');
-        const timeProgress = document.querySelector('.time-progress');
-
-        // 開始時間と終了時間の設定
-        if (this.visualizationData && this.visualizationData.length > 0) {
-            const startTime = this.formatTime(this.visualizationData[0].timestamp);
-            const endTime = this.formatTime(this.visualizationData[this.visualizationData.length - 1].timestamp);
-            document.getElementById('start-time').textContent = startTime;
-            document.getElementById('end-time').textContent = endTime;
-        }
-
-        // スライダーのクリックイベント
-        timeSlider.addEventListener('click', (e) => {
-            const rect = timeSlider.getBoundingClientRect();
-            const position = (e.clientX - rect.left) / rect.width;
-            this.updateTimePosition(position);
-        });
-
-        // ドラッグイベント
-        let isDragging = false;
-
-        timeThumb.addEventListener('mousedown', () => {
-            isDragging = true;
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const rect = timeSlider.getBoundingClientRect();
-            const position = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            this.updateTimePosition(position);
-        });
-
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
-
-        // タッチイベント
-        timeThumb.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            e.preventDefault();
-        });
-
-        document.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            const touch = e.touches[0];
-            const rect = timeSlider.getBoundingClientRect();
-            const position = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
-            this.updateTimePosition(position);
-            e.preventDefault();
-        });
-
-        document.addEventListener('touchend', () => {
-            isDragging = false;
-        });
-    },
-
-    // 時間位置の更新
-    updateTimePosition(position) {
-        if (!this.visualizationData || this.visualizationData.length === 0) return;
-
-        try {
-            // 位置を0-1の範囲に制限
-            position = Math.max(0, Math.min(1, position));
-            
-            // インデックスの計算
-            const index = Math.round(position * (this.visualizationData.length - 1));
-            if (index < 0 || index >= this.visualizationData.length) {
-                console.warn(`[DEBUG] Invalid calculated index: ${index}`);
-                return;
-            }
-            
-            console.log(`[DEBUG] Updating time position to index: ${index}`);
-            
-            // 現在のインデックスを更新
-            this.currentTimeIndex = index;
-            
-            // 表示を更新
-            this.updateDisplay(index);
-            
-            // マーカー位置を更新
-            this.updateMarkerPositions();
-            
-            // タイムラインの進行状況を更新
-            this.updateTimelineProgress();
-            
-            // プログレスバーとサムの位置を更新 (念のため直接更新)
-            const timeThumb = document.querySelector('.time-thumb');
-            const timeProgress = document.querySelector('.time-progress');
-            
-            if (timeThumb && timeProgress) {
-                timeThumb.style.left = `${position * 100}%`;
-                timeProgress.style.width = `${position * 100}%`;
-            }
-            
-            // UI更新
-            this.updateTimeDisplay(index);
-        } catch (error) {
-            console.error('[DEBUG] Error in updateTimePosition:', error);
-        }
-    },
-
-    // 時間表示の更新
-    updateTimeDisplay(index) {
-        const timeThumb = document.querySelector('.time-thumb');
-        const timeProgress = document.querySelector('.time-progress');
-        
-        if (this.visualizationData && this.visualizationData.length > 0 && index >= 0 && index < this.visualizationData.length) {
-            // 現在時刻の表示
-            const currentTime = this.formatTime(this.visualizationData[index].timestamp);
-            const currentTimeDisplayEl = document.getElementById('current-time-display');
-            const currentTimeEl = document.getElementById('current-time');
-            
-            // 要素が存在する場合のみ更新
-            if (currentTimeDisplayEl) {
-                currentTimeDisplayEl.textContent = currentTime;
-            }
-            
-            if (currentTimeEl) {
-                currentTimeEl.textContent = currentTime;
-            }
-            
-            // プログレスバーの更新
-            if (timeThumb && timeProgress) {
-                const position = index / (this.visualizationData.length - 1);
-                timeThumb.style.left = `${position * 100}%`;
-                timeProgress.style.width = `${position * 100}%`;
-            }
-        }
-    },
-
-    // 再生中のタイムラインの更新
-    updateSupplementaryTimeBar(index) {
-        if (!this.visualizationData || this.visualizationData.length === 0) return;
-        
-        try {
-            // 時間表示の更新
-            if (index !== undefined && index >= 0 && index < this.visualizationData.length) {
-                this.updateTimeDisplay(index);
-            } else {
-                console.warn('[DEBUG] Invalid index in updateSupplementaryTimeBar:', index);
-            }
-        } catch (error) {
-            console.warn('[DEBUG] Error updating supplementary time bar:', error);
-        }
-    },
-
-    handleMapStyleToggle() {
-        // デバウンス処理を追加
-        if (this.isToggling) return;
-        this.isToggling = true;
-        
-        console.log('[DEBUG] Toggling map style', new Error().stack);
-        
-        if (!this.map) {
-            console.error('[DEBUG] Map not initialized');
-            this.isToggling = false;
-            return;
-        }
-
-        const mapStyleBtn = document.getElementById('map-style-toggle');
-        
-        try {
-            // 現在のレイヤーを確認して切り替え
-            if (this.currentLayer === this.standardLayer) {
-                // 標準地図から衛星画像に切り替え
-                this.map.removeLayer(this.standardLayer);
-                this.satelliteLayer.addTo(this.map);
-                this.currentLayer = this.satelliteLayer;
-                
-                if (mapStyleBtn) {
-                    mapStyleBtn.textContent = "標準地図に切り替え";
-                }
-                console.log('[DEBUG] Switched to satellite map', new Error().stack);
-            } else {
-                // 衛星画像から標準地図に切り替え
-                this.map.removeLayer(this.satelliteLayer);
-                this.standardLayer.addTo(this.map);
-                this.currentLayer = this.standardLayer;
-                
-                if (mapStyleBtn) {
-                    mapStyleBtn.textContent = "衛星画像に切り替え";
-                }
-                console.log('[DEBUG] Switched to standard map', new Error().stack);
-            }
-
-            // マップを再描画
-            this.map.invalidateSize();
-        } catch (error) {
-            console.error('[DEBUG] Error during map style toggle:', error);
-        } finally {
-            // 処理完了後にフラグをリセット
-            setTimeout(() => {
-                this.isToggling = false;
-            }, 300);
-        }
-    },
-
-    // 時刻をフォーマットする関数
-    formatTime(timestamp) {
-        if (!timestamp) return '-';
-        const date = new Date(timestamp);
-        // UTCからJST(+9時間)に変換
-        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
-        const year = jstDate.getUTCFullYear();
-        const month = (jstDate.getUTCMonth() + 1).toString().padStart(2, '0');
-        const day = jstDate.getUTCDate().toString().padStart(2, '0');
-        const hours = jstDate.getUTCHours().toString().padStart(2, '0');
-        const minutes = jstDate.getUTCMinutes().toString().padStart(2, '0');
-        const seconds = jstDate.getUTCSeconds().toString().padStart(2, '0');
-        return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
-    },
-
+    // 再生
     play() {
         if (!this.visualizationData || this.visualizationData.length === 0) {
             console.warn('[DEBUG] Cannot play: No visualization data');
@@ -2495,6 +1475,7 @@ const Visualization = {
         this.startAnimation();
     },
 
+    // 一時停止
     pause() {
         console.log('[DEBUG] Pausing playback');
         this.isPlaying = false;
@@ -2502,6 +1483,7 @@ const Visualization = {
         this.updatePlayButtonState();
     },
 
+    // 速度設定
     setSpeed(speed) {
         // 速度を数値に変換
         speed = parseFloat(speed);
@@ -2527,5 +1509,20 @@ const Visualization = {
         if (speedSlider && Math.abs(parseFloat(speedSlider.value) - this.playbackSpeed) > 0.01) {
             speedSlider.value = this.playbackSpeed;
         }
+    },
+    
+    // 時刻をフォーマットする関数
+    formatTime(timestamp) {
+        if (!timestamp) return '-';
+        const date = new Date(timestamp);
+        // UTCからJST(+9時間)に変換
+        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+        const year = jstDate.getUTCFullYear();
+        const month = (jstDate.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = jstDate.getUTCDate().toString().padStart(2, '0');
+        const hours = jstDate.getUTCHours().toString().padStart(2, '0');
+        const minutes = jstDate.getUTCMinutes().toString().padStart(2, '0');
+        const seconds = jstDate.getUTCSeconds().toString().padStart(2, '0');
+        return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
     }
 }; 
